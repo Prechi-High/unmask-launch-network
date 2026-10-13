@@ -42,8 +42,8 @@ export async function chooseCategory(categoryId: string) {
   await supabase.from('launch_category_votes').delete().eq('user_id', auth.user.id);
   const { error } = await supabase.from('launch_category_votes').insert({ user_id: auth.user.id, category_id: categoryId });
   if (error) throw error;
-  await supabase.rpc('claim_launch_task', { p_task_key: 'choose_category' }).catch(() => undefined);
-  await supabase.rpc('qualify_my_launch_referral').catch(() => undefined);
+  await supabase.rpc('claim_launch_task', { p_task_key: 'choose_category' });
+  await supabase.rpc('qualify_my_launch_referral');
 }
 
 export async function claimTask(key: string) {
@@ -64,7 +64,7 @@ export async function suggestProduct(input: any) {
     notes: input.notes?.trim() || null
   });
   if (error) throw error;
-  await supabase.rpc('qualify_my_launch_referral').catch(() => undefined);
+  await supabase.rpc('qualify_my_launch_referral');
 }
 
 function slugify(v: string) {
@@ -116,7 +116,7 @@ export async function submitExperience(input: any) {
     p_would_rebuy: input.wouldRebuy
   });
   if (error) throw error;
-  await supabase.rpc('qualify_my_launch_referral').catch(() => undefined);
+  await supabase.rpc('qualify_my_launch_referral');
   return data;
 }
 
