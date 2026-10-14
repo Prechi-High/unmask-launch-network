@@ -59,9 +59,29 @@ export default function AdminConsole({go}:{go:(view:string)=>void}){
     setSectionStats(st);
   };
   const loadSection=async(next=section)=>{
-    if(next==='overview'||next==='settings'||next==='trends') return;
+    setSelected(null);
+    if(next==='overview'||next==='settings'||next==='trends'){
+      setRows([]);
+      return;
+    }
+
+    // Rewards returns an object; all other data screens return arrays.
+    setRows(next==='rewards'?{rules:[],ledger:[]}:[]);
     const data=await getAdminSection(next);
-    setRows(data);setSelected(Array.isArray(data)?data[0]:(data?.ledger?.[0]||data?.rules?.[0]||null));
+
+    if(next==='rewards'){
+      const safe={
+        rules:Array.isArray(data?.rules)?data.rules:[],
+        ledger:Array.isArray(data?.ledger)?data.ledger:[]
+      };
+      setRows(safe);
+      setSelected(safe.ledger[0]||safe.rules[0]||null);
+      return;
+    }
+
+    const safe=Array.isArray(data)?data:[];
+    setRows(safe);
+    setSelected(safe[0]||null);
   };
   const refresh=async(next=section)=>{
     setBusy('load');
@@ -81,11 +101,12 @@ export default function AdminConsole({go}:{go:(view:string)=>void}){
   useEffect(()=>{if(allowed) refresh(section)},[section,allowed]);
 
   const filtered=useMemo(()=>{
-    if(!Array.isArray(rows)) return rows;
+    if(section==='rewards') return rows;
+    if(!Array.isArray(rows)) return [];
     const q=search.trim().toLowerCase();
     if(!q)return rows;
     return rows.filter((r:any)=>JSON.stringify(r).toLowerCase().includes(q));
-  },[rows,search]);
+  },[rows,search,section]);
 
   if(allowed===null)return <div className="admin-guard"><Brand/><span>Opening admin…</span></div>;
   if(!allowed)return <div className="admin-guard"><Brand/><h2>Admin access required</h2><p>This area is only available to authorised Unmask administrators.</p><button onClick={()=>go('dashboard')}>Return to Unmask</button></div>;
@@ -245,10 +266,12 @@ function RewardsPage({data,stats,selected,setSelected,onChanged}:any){
 }
 
 function UsersPage({rows,stats,selected,setSelected}:any){
+  const safeRows=Array.isArray(rows)?rows:[];
+  const safeStats=stats||{};
   return <>
-    <div className="admin-stats four"><Stat icon="users" label="Total Users" value={stats.total||0}/><Stat icon="shield" label="Administrators" value={stats.admins||0}/><Stat icon="camera" label="Users Who Unmasked" value={stats.unmaskers_with_experience||0}/><Stat icon="coins" label="Coins Held" value={stats.coins_held||0}/></div>
+    <div className="admin-stats four"><Stat icon="users" label="Total Users" value={safeStats.total||0}/><Stat icon="shield" label="Administrators" value={safeStats.admins||0}/><Stat icon="camera" label="Users Who Unmasked" value={safeStats.unmaskers_with_experience||0}/><Stat icon="coins" label="Coins Held" value={safeStats.coins_held||0}/></div>
     <TableLayout detail={selected&&<><DetailTitle icon="user" title="User Detail"/><h3>{selected.display_name}</h3><Info label="Country" value={selected.country}/><Info label="Region" value={selected.region}/><Info label="Unmaskings" value={selected.unmaskings}/><Info label="Coins" value={selected.coins}/><Info label="Joined" value={fmtDate(selected.created_at)}/></>}>
-      <CardHead icon="users" title="All Users" sub="Monitor Unmaskers and their community participation."/><AdminTable headers={['User','Country','Unmaskings','Coins','Role','Joined']}>{rows.map((r:any)=><tr key={r.id} onClick={()=>setSelected(r)}><td><b>{r.display_name||'Unmasker'}</b></td><td>{[r.region,r.country].filter(Boolean).join(', ')||'—'}</td><td>{r.unmaskings||0}</td><td>{r.coins||0}</td><td><Pill>{r.is_admin?'Admin':'Unmasker'}</Pill></td><td>{fmtDate(r.created_at)}</td></tr>)}</AdminTable>
+      <CardHead icon="users" title="All Users" sub="Monitor Unmaskers and their community participation."/><AdminTable headers={['User','Country','Unmaskings','Coins','Role','Joined']}>{safeRows.map((r:any)=><tr key={r.id} onClick={()=>setSelected(r)}><td><b>{r.display_name||'Unmasker'}</b></td><td>{[r.region,r.country].filter(Boolean).join(', ')||'—'}</td><td>{r.unmaskings||0}</td><td>{r.coins||0}</td><td><Pill>{r.is_admin?'Admin':'Unmasker'}</Pill></td><td>{fmtDate(r.created_at)}</td></tr>)}</AdminTable>
     </TableLayout>
   </>;
 }
