@@ -115,7 +115,6 @@ export default function AdminConsole({go}:{go:(view:string)=>void}){
     <aside className="admin-sidebar">
       <Brand/>
       <nav>{NAV.map(([key,label,icon])=><button key={key} className={section===key?'active':''} onClick={()=>{setSection(key);setSelected(null)}}><FA name={icon}/><span>{label}</span></button>)}</nav>
-      <div className="admin-side-card"><div className="side-art">U</div><b>Reveal the truth behind products.</b><p>Real experiences. Clear information. Smarter buying decisions.</p></div>
       <button className="admin-exit" onClick={()=>go('dashboard')}><FA name="arrow-left"/> Back to community</button>
     </aside>
 
