@@ -96,9 +96,10 @@ function App() {
 function Landing({ go, session }: any) {
   const [feed,setFeed]=useState<any[]>([]);
   const [stats,setStats]=useState<any>({unmasked_today:0,unmasked_total:0,unmaskers_total:0,category_votes:0});
+  const [buildState,setBuildState]=useState<any>({round:null,categories:[],experiences_gathered:0});
 
   useEffect(()=>{
-    Promise.all([getCommunityFeed(6),getCommunityStats()]).then(([f,s])=>{setFeed(f);setStats(s)}).catch(()=>undefined);
+    Promise.all([getCommunityFeed(6),getCommunityStats(),getBuildVisionState()]).then(([f,st,bs])=>{setFeed(f);setStats(st);setBuildState(bs)}).catch(()=>undefined);
   },[]);
 
   return <main className="landing movement-landing">
@@ -139,6 +140,10 @@ function Landing({ go, session }: any) {
         <article><span>2</span><b>Unmask what happened</b><small>How long it lasted, what worked, what failed, what surprised you.</small></article>
         <article><span>3</span><b>Leave the truth behind</b><small>Another person sees the experience before spending their money.</small></article>
       </div>
+    </section>
+
+    <section className="landing-build-layer">
+      <BuildRoadmap buildState={buildState} currentVote={null} onVote={()=>go(session?'dashboard':'auth')} compact/>
     </section>
 
     <section className="landing-feed">
@@ -510,16 +515,17 @@ function Dashboard({ go }: any) {
   const [feed,setFeed]=useState<any[]>([]);
   const [trends,setTrends]=useState<any>({categories:[],products:[],total_votes:0,total_suggestions:0});
   const [categories,setCategories]=useState<any[]>([]);
+  const [buildState,setBuildState]=useState<any>({round:null,categories:[],experiences_gathered:0});
   const [notice,setNotice]=useState<any>(null);
   const [clickedTask,setClickedTask]=useState<string|null>(null);
   const [showCategoryPicker,setShowCategoryPicker]=useState(false);
   const [voteBusy,setVoteBusy]=useState(false);
 
   const refresh=async()=>{
-    const [sm,st,mi,fd,tr,ca]=await Promise.all([
-      getSummary(),getCommunityStats(),getMyUnmaskerMission(),getCommunityFeed(12),getLaunchTrends(),listCategories()
+    const [sm,st,mi,fd,tr,ca,bs]=await Promise.all([
+      getSummary(),getCommunityStats(),getMyUnmaskerMission(),getCommunityFeed(12),getLaunchTrends(),listCategories(),getBuildVisionState()
     ]);
-    setSummary(sm);setStats(st);setMission(mi);setFeed(fd);setTrends(tr);setCategories(ca);
+    setSummary(sm);setStats(st);setMission(mi);setFeed(fd);setTrends(tr);setCategories(ca);setBuildState(bs);
   };
 
   useEffect(()=>{
@@ -609,16 +615,7 @@ function Dashboard({ go }: any) {
       <CommunityFeed items={feed} onLike={like}/>
     </section>
 
-    <section className="vote-mission">
-      <div className="vote-mission-image"><img src={categoryImage(summary?.voteName||'Beauty')} alt=""/></div>
-      <div className="vote-mission-copy">
-        <span className="eyebrow">YOU ALSO GET A SAY</span>
-        <h2>Which category should Unmask build first?</h2>
-        <p>Vote for the kind of products you most want the full Unmask experience to launch for.</p>
-        {summary?.voteName?<div className="vote-status"><FA name="circle-check"/>Your vote: <b>{summary.voteName}</b></div>:<div className="vote-status pending"><span className="live-dot"/>You have not voted yet.</div>}
-        <button className="btn solid" onClick={()=>setShowCategoryPicker(true)}>{summary?.voteName?'Change my vote':'Cast my vote'} <FA name="arrow-right"/></button>
-      </div>
-    </section>
+    <BuildRoadmap buildState={buildState} currentVote={summary?.voteName} onVote={()=>setShowCategoryPicker(true)}/>
 
     <section className="simple-next">
       <button onClick={()=>go('suggest')}>
