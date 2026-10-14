@@ -61,7 +61,10 @@ async function imageToCompressedBase64(file: File) {
 function App() {
   const [session, setSession] = useState<any>(null);
   const [ready, setReady] = useState(false);
-  const [view, setView] = useState(() => localStorage.getItem('unmask_view') || 'landing');
+  const [view, setView] = useState(() => {
+    const stored = localStorage.getItem('unmask_view') || 'landing';
+    return stored === 'rewards' ? 'dashboard' : stored;
+  });
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -86,7 +89,6 @@ function App() {
   if (view === 'trends') return <Trends go={go} session={session} />;
   if (view === 'suggest') return session ? <Suggest go={go} /> : <Auth go={go} loginFirst />;
   if (view === 'unmask') return session ? <Unmask go={go} /> : <Auth go={go} loginFirst />;
-  if (view === 'rewards') return session ? <Rewards go={go} /> : <Auth go={go} loginFirst />;
   return <Landing go={go} session={session} />;
 }
 
