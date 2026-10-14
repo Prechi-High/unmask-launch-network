@@ -113,7 +113,7 @@ function Landing({ go, session }: any) {
       <div className="movement-copy">
         <span className="movement-kicker">WE ARE UNMASKERS.</span>
         <h1>We reveal what products are <em>really</em> like.</h1>
-        <p>Used something? Tell people what actually happened. What lasted. What broke. What wasted your money. What was worth it.</p>
+        <p>Used something? Tell people what actually happened. Together, we’re building Unmask — the tool that will let you photograph a product and see what real users discovered before you buy.</p>
         <div className="movement-actions">
           <button className="btn solid movement-primary" onClick={()=>go(session?'unmask':'auth')}>Unmask a product <FA name="arrow-right"/></button>
           <button className="btn ghost" onClick={()=>go('trends')}>See what Unmaskers are doing</button>
@@ -128,7 +128,7 @@ function Landing({ go, session }: any) {
       <div className="movement-manifesto">
         <div className="manifesto-stamp">UNMASK IT.</div>
         <h2>If a product deserves praise, say it. If it wasted your money, drag it into the light.</h2>
-        <p>Your experience can save the next person from making the same mistake.</p>
+        <p>Your experience helps the next buyer now — and helps us build the Unmask tool category by category for the whole community.</p>
       </div>
     </section>
 
