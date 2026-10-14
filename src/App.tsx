@@ -212,6 +212,92 @@ function Landing({ go, session }: any) {
   </main>;
 }
 
+
+function NotificationCenter({ userId, go }:any){
+  const [open,setOpen]=useState(false);
+  const [state,setState]=useState<any>({unread:0,items:[]});
+  const [pushEnabled,setPushEnabled]=useState(false);
+  const [busy,setBusy]=useState(false);
+  const [notice,setNotice]=useState('');
+
+  const refresh=()=>getNotifications(30).then(setState).catch(()=>undefined);
+
+  useEffect(()=>{
+    if(!userId) return;
+    refresh();
+    getPushSubscriptionStatus().then(setPushEnabled).catch(()=>undefined);
+    const timer=setInterval(refresh,30000);
+    const channel=supabase.channel('my-notifications-'+userId)
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'notifications',filter:'user_id=eq.'+userId},refresh)
+      .subscribe();
+    return()=>{clearInterval(timer);supabase.removeChannel(channel)};
+  },[userId]);
+
+  const openItem=async(item:any)=>{
+    if(!item.read_at){
+      await markNotificationRead(item.id).catch(()=>undefined);
+      setState((x:any)=>({unread:Math.max(0,(x.unread||0)-1),items:x.items.map((n:any)=>n.id===item.id?{...n,read_at:new Date().toISOString()}:n)}));
+    }
+    const link=item.payload?.link||'';
+    if(link.includes('post=')) go('trends');
+    else if(link.includes('dashboard')) go('dashboard');
+    setOpen(false);
+  };
+
+  const allRead=async()=>{
+    await markAllNotificationsRead().catch(()=>undefined);
+    setState((x:any)=>({unread:0,items:x.items.map((n:any)=>({...n,read_at:n.read_at||new Date().toISOString()}))}));
+  };
+
+  const enable=async()=>{
+    setBusy(true);setNotice('');
+    try{await enableBrowserPush();setPushEnabled(true);setNotice('Push notifications are on.')}
+    catch(err:any){setNotice(err.message||'Could not enable push notifications.')}
+    finally{setBusy(false)}
+  };
+
+  const iconFor=(type:string)=>type==='helpful'?'heart':type==='coins'?'coins':type==='build_update'?'hammer':'bell';
+
+  return <div className="notification-wrap">
+    <button className="notification-bell" onClick={()=>setOpen(v=>!v)} aria-label="Notifications">
+      <FA name="bell"/>
+      {state.unread>0&&<span>{state.unread>9?'9+':state.unread}</span>}
+    </button>
+
+    {open&&<div className="notification-panel">
+      <div className="notification-head">
+        <div><b>Notifications</b><span>Updates from your Unmask community.</span></div>
+        {state.unread>0&&<button onClick={allRead}>Mark all read</button>}
+      </div>
+
+      {!pushEnabled&&<div className="push-card">
+        <span className="push-icon"><FA name="mobile-screen-button"/></span>
+        <div><b>Keep Unmask with you</b><small>Get category updates and community activity even when this page is closed.</small></div>
+        <button disabled={busy} onClick={enable}>{busy?'Turning on…':'Allow push'}</button>
+      </div>}
+
+      {notice&&<small className="push-note">{notice}</small>}
+
+      <div className="notification-list">
+        {!state.items?.length&&<div className="notification-empty"><FA name="bell-slash"/><span>No notifications yet.</span></div>}
+        {state.items?.map((item:any)=><button key={item.id} className={'notification-item '+(!item.read_at?'unread':'')} onClick={()=>openItem(item)}>
+          <span className="notification-type"><FA name={iconFor(item.type)}/></span>
+          <div><b>{item.payload?.title||'Unmask update'}</b><span>{item.payload?.body||'There is something new in the community.'}</span><small>{new Date(item.created_at).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</small></div>
+          {!item.read_at&&<i className="unread-dot"/>}
+        </button>)}
+      </div>
+    </div>}
+  </div>;
+}
+
+function CoinPeek({ amount=0 }:any){
+  const [open,setOpen]=useState(false);
+  return <div className="coin-peek-wrap">
+    <button className="coin-peek" onClick={()=>setOpen(v=>!v)}><FA name="coins"/><span>{amount}</span></button>
+    {open&&<div className="coin-peek-pop"><b>Your Unmask Coins</b><span>Keep them. They’re reserved for future partner-product discounts when those offers launch.</span></div>}
+  </div>;
+}
+
 function Shell({ children, go, active, summary }: any) {
   const nav = [
     ['dashboard','Home','house'],
@@ -219,7 +305,14 @@ function Shell({ children, go, active, summary }: any) {
     ['trends','Live','bolt']
   ];
   return <main className="app-shell">
-    <header className="app-head"><Brand /><div className="head-right"><span className="avatar">{summary?.displayName?.[0]?.toUpperCase() || 'U'}</span></div></header>
+    <header className="app-head">
+      <Brand />
+      <div className="head-right">
+        <CoinPeek amount={summary?.coins||0}/>
+        <NotificationCenter userId={summary?.userId} go={go}/>
+        <span className="avatar">{summary?.displayName?.[0]?.toUpperCase() || 'U'}</span>
+      </div>
+    </header>
     <div className="app-body">{children}</div>
     <nav className="bottom-nav simple-nav">{nav.map(([v,label,icon]) => <button key={v} className={active === v ? 'active' : ''} onClick={() => go(v)}><FA name={icon} /><span>{label}</span></button>)}</nav>
   </main>;
