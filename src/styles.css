@@ -156,3 +156,101 @@
   .notification-panel{position:fixed;left:12px;right:12px;top:72px;width:auto;max-height:76vh}.push-card{grid-template-columns:36px 1fr}.push-card button{grid-column:2;justify-self:start}.coin-peek-pop{position:fixed;right:12px;top:70px}
   .invite-unmasker-card{grid-template-columns:46px 1fr}.invite-unmasker-mark{width:46px;height:46px}.invite-share-actions{grid-column:1/3;justify-content:flex-start}.invite-share-actions .btn{flex:1}.post-actions button{font-size:9px;padding:7px 8px}
 }
+
+/* Post-unmask sharing + clearer push opt-in */
+.push-card{
+  background:linear-gradient(135deg,#f3e7ad 0%,#e8d58a 58%,#ddc76c 100%)!important;
+  color:#32280e!important;
+  border:1px solid #d6bd59;
+  box-shadow:0 10px 28px #7c682216;
+  grid-template-columns:44px 1fr auto!important;
+  padding:14px!important;
+}
+.push-icon{
+  width:44px!important;height:44px!important;
+  border-radius:13px!important;
+  background:#fff9df!important;
+  color:#765f10!important;
+  border:1px solid #dcca7a;
+  box-shadow:0 5px 14px #7d681514;
+}
+.push-card b{font-size:12px!important;color:#2e260d}
+.push-card small{font-size:9px!important;color:#62541f!important;line-height:1.45!important}
+.push-card button{
+  background:#fff!important;
+  color:#5d4a09!important;
+  border:1px solid #cdb75b!important;
+  padding:9px 12px!important;
+  font-size:9px!important;
+  box-shadow:0 5px 14px #69570d14;
+}
+.push-card button:hover{background:#fff8d8!important}
+
+.social-follow-card.x-follow-banner{
+  background-size:135% auto!important;
+  background-position:center!important;
+  background-repeat:no-repeat!important;
+}
+.social-follow-card.x-follow-banner:before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:linear-gradient(90deg,rgba(22,3,9,.74),rgba(22,3,9,.18));
+  z-index:0;
+}
+.social-follow-card.x-follow-banner>*{position:relative;z-index:1}
+
+.unmask-success{max-width:760px;margin-inline:auto;text-align:center}
+.unmask-success .success-mark{
+  width:64px;height:64px;border-radius:50%;
+  margin:0 auto 12px;
+  display:grid;place-items:center;
+  background:#e9f7ed;color:#247844;
+  font-size:30px;
+  box-shadow:0 10px 25px #286b3b15;
+}
+.unmask-success>p{max-width:590px;margin:8px auto 18px;color:#5e676d;line-height:1.55}
+.share-after-unmask{
+  text-align:left;
+  margin-top:18px;
+  border:1px solid #d9eadf;
+  background:linear-gradient(135deg,#effaf2,#fbfffc);
+  border-radius:20px;
+  padding:16px;
+  box-shadow:0 12px 30px #1f7c3d0c;
+}
+.share-after-copy{
+  display:grid;
+  grid-template-columns:46px 1fr;
+  gap:11px;
+  align-items:center;
+}
+.share-after-copy>div{display:grid;gap:3px}
+.share-after-copy b{font-size:15px;color:#1f4f30}
+.share-after-copy small{font-size:10px;color:#617067;line-height:1.45}
+.share-after-icon{
+  width:46px;height:46px;border-radius:14px;
+  background:#25D366;color:#fff;
+  display:grid;place-items:center;
+  font-size:24px;
+  box-shadow:0 8px 18px #25d3662b;
+}
+.share-after-actions{
+  display:flex;gap:8px;flex-wrap:wrap;
+  margin-top:13px;
+}
+.whatsapp-share{
+  background:#25D366!important;
+  color:#fff!important;
+  border-color:#25D366!important;
+}
+.whatsapp-share:hover{background:#1fbd59!important}
+.success-next{margin-top:16px;color:var(--wine);font-weight:800}
+
+@media(max-width:700px){
+  .push-card{grid-template-columns:42px 1fr!important}
+  .push-card button{grid-column:1/3!important;width:100%;font-size:10px!important;padding:10px 12px!important}
+  .share-after-actions{display:grid;grid-template-columns:1fr}
+  .share-after-actions .btn{width:100%}
+  .social-follow-card.x-follow-banner{background-size:150% auto!important}
+}
