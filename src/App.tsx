@@ -225,6 +225,7 @@ function NotificationCenter({ userId, go }:any){
   const [pushEnabled,setPushEnabled]=useState(false);
   const [busy,setBusy]=useState(false);
   const [notice,setNotice]=useState('');
+  const [selectedNotification,setSelectedNotification]=useState<any>(null);
 
   const refresh=()=>getNotifications(30).then(setState).catch(()=>undefined);
 
@@ -240,13 +241,31 @@ function NotificationCenter({ userId, go }:any){
   },[userId]);
 
   const openItem=async(item:any)=>{
+    let opened=item;
     if(!item.read_at){
       await markNotificationRead(item.id).catch(()=>undefined);
-      setState((x:any)=>({unread:Math.max(0,(x.unread||0)-1),items:x.items.map((n:any)=>n.id===item.id?{...n,read_at:new Date().toISOString()}:n)}));
+      const readAt=new Date().toISOString();
+      opened={...item,read_at:readAt};
+      setState((x:any)=>({unread:Math.max(0,(x.unread||0)-1),items:x.items.map((n:any)=>n.id===item.id?{...n,read_at:readAt}:n)}));
     }
-    const link=item.payload?.link||'';
+    setSelectedNotification(opened);
+  };
+
+  const followNotificationLink=(item:any)=>{
+    const link=item?.payload?.link||'';
     if(link.includes('post=')) go('trends');
-    else if(link.includes('dashboard')) go('dashboard');
+    else if(link.includes('view=dashboard')) go('dashboard');
+    else if(link.includes('view=unmask')) go('unmask');
+    else if(link.includes('view=suggest')) go('suggest');
+    else if(link.includes('view=trends')) go('trends');
+    else if(link){
+      try{
+        const target=new URL(link,window.location.origin);
+        if(target.origin===window.location.origin) window.location.href=target.toString();
+        else window.open(target.toString(),'_blank','noopener,noreferrer');
+      }catch{}
+    }
+    setSelectedNotification(null);
     setOpen(false);
   };
 
@@ -265,33 +284,52 @@ function NotificationCenter({ userId, go }:any){
   const iconFor=(type:string)=>type==='helpful'?'heart':type==='coins'?'coins':type==='build_update'?'hammer':'bell';
 
   return <div className="notification-wrap">
-    <button className="notification-bell" onClick={()=>setOpen(v=>!v)} aria-label="Notifications">
+    <button className="notification-bell" onClick={()=>{setOpen(v=>!v);setSelectedNotification(null)}} aria-label="Notifications">
       <FA name="bell"/>
       {state.unread>0&&<span>{state.unread>9?'9+':state.unread}</span>}
     </button>
 
-    {open&&<div className="notification-panel">
-      <div className="notification-head">
-        <div><b>Notifications</b><span>Updates from your Unmask community.</span></div>
-        {state.unread>0&&<button onClick={allRead}>Mark all read</button>}
-      </div>
+    {open&&<div className={'notification-panel '+(selectedNotification?'showing-detail':'')}>
+      {selectedNotification
+        ? <div className="notification-detail-view">
+            <div className="notification-detail-head">
+              <button className="notification-back" onClick={()=>setSelectedNotification(null)}><FA name="arrow-left"/> Back</button>
+              <button className="notification-close" onClick={()=>{setSelectedNotification(null);setOpen(false)}} aria-label="Close notifications"><FA name="xmark"/></button>
+            </div>
 
-      {!pushEnabled&&<div className="push-card">
-        <span className="push-icon"><FA name="bell"/></span>
-        <div><b>Don’t miss what Unmaskers are doing.</b><small>Get community activity, useful reactions and category build updates on your phone.</small></div>
-        <button disabled={busy} onClick={enable}>{busy?'Turning on…':'Enable notifications'}</button>
-      </div>}
+            <div className="notification-detail-icon"><FA name={iconFor(selectedNotification.type)}/></div>
+            <span className="notification-detail-type">{String(selectedNotification.type||'update').replaceAll('_',' ')}</span>
+            <h3>{selectedNotification.payload?.title||'Unmask update'}</h3>
+            <p>{selectedNotification.payload?.body||'There is something new in the Unmask community.'}</p>
+            <small className="notification-detail-time">{new Date(selectedNotification.created_at).toLocaleString(undefined,{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</small>
 
-      {notice&&<small className="push-note">{notice}</small>}
+            {selectedNotification.payload?.link&&<button className="notification-detail-action" onClick={()=>followNotificationLink(selectedNotification)}>
+              {selectedNotification.type==='helpful'?'View unmasking':'Open related page'} <FA name="arrow-right"/>
+            </button>}
+          </div>
+        : <>
+            <div className="notification-head">
+              <div><b>Notifications</b><span>Updates from your Unmask community.</span></div>
+              {state.unread>0&&<button onClick={allRead}>Mark all read</button>}
+            </div>
 
-      <div className="notification-list">
-        {!state.items?.length&&<div className="notification-empty"><FA name="bell-slash"/><span>No notifications yet.</span></div>}
-        {state.items?.map((item:any)=><button key={item.id} className={'notification-item '+(!item.read_at?'unread':'')} onClick={()=>openItem(item)}>
-          <span className="notification-type"><FA name={iconFor(item.type)}/></span>
-          <div><b>{item.payload?.title||'Unmask update'}</b><span>{item.payload?.body||'There is something new in the community.'}</span><small>{new Date(item.created_at).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</small></div>
-          {!item.read_at&&<i className="unread-dot"/>}
-        </button>)}
-      </div>
+            {!pushEnabled&&<div className="push-card">
+              <span className="push-icon"><FA name="bell"/></span>
+              <div><b>Don’t miss what Unmaskers are doing.</b><small>Get community activity, useful reactions and category build updates on your phone.</small></div>
+              <button disabled={busy} onClick={enable}>{busy?'Turning on…':'Enable notifications'}</button>
+            </div>}
+
+            {notice&&<small className="push-note">{notice}</small>}
+
+            <div className="notification-list">
+              {!state.items?.length&&<div className="notification-empty"><FA name="bell-slash"/><span>No notifications yet.</span></div>}
+              {state.items?.map((item:any)=><button key={item.id} className={'notification-item '+(!item.read_at?'unread':'')} onClick={()=>openItem(item)}>
+                <span className="notification-type"><FA name={iconFor(item.type)}/></span>
+                <div><b>{item.payload?.title||'Unmask update'}</b><span>{item.payload?.body||'There is something new in the community.'}</span><small>{new Date(item.created_at).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</small></div>
+                {!item.read_at&&<i className="unread-dot"/>}
+              </button>)}
+            </div>
+          </>}
     </div>}
   </div>;
 }
