@@ -341,6 +341,7 @@ const acquisition = [['','How did you get it?'],['bought_personally','Bought per
 function Unmask({ go }: any) {
   const [summary,setSummary]=useState<any>(null);
   const [step,setStep]=useState(1);
+  const [ownership,setOwnership]=useState<'owns_now'|'used_before'|''>('');
   const [photo,setPhoto]=useState<any>(null);
   const [identifying,setIdentifying]=useState(false);
   const [matches,setMatches]=useState<any[]>([]);
@@ -348,81 +349,235 @@ function Unmask({ go }: any) {
   const [product,setProduct]=useState<any>(null);
   const [custom,setCustom]=useState('');
   const [customRows,setCustomRows]=useState<any[]>([]);
-  const [ownership,setOwnership]=useState('owns_now');
   const [context,setContext]=useState({duration:'',frequency:'',acquisition:'',usedFor:'',body:'',wouldRebuy:null as any});
   const [verified,setVerified]=useState(false);
   const [busy,setBusy]=useState('');
   const [notice,setNotice]=useState<any>(null);
+  const [verificationIssue,setVerificationIssue]=useState(false);
+
   useEffect(()=>{getSummary().then(setSummary)},[]);
-  useEffect(()=>{if(custom.trim().length<2){setCustomRows([]);return;}const t=setTimeout(()=>searchProducts(custom).then(setCustomRows).catch(()=>setCustomRows([])),350);return()=>clearTimeout(t)},[custom]);
+  useEffect(()=>{
+    if(step!==2 || ownership!=='used_before' || custom.trim().length<2){setCustomRows([]);return;}
+    const t=setTimeout(()=>searchProducts(custom).then(setCustomRows).catch(()=>setCustomRows([])),350);
+    return()=>clearTimeout(t);
+  },[custom,step,ownership]);
+
+  const chooseRelationship=(value:'owns_now'|'used_before')=>{
+    setOwnership(value);
+    setProduct(null);
+    setPhoto(null);
+    setGuess(null);
+    setMatches([]);
+    setCustom('');
+    setVerified(false);
+    setVerificationIssue(false);
+    setNotice(null);
+    setStep(2);
+  };
 
   const takePhoto=async(file:File|null)=>{
     if(!file)return;
-    setNotice(null);setIdentifying(true);setMatches([]);setProduct(null);setVerified(false);
+    setNotice(null);setIdentifying(true);setMatches([]);setProduct(null);setVerified(false);setVerificationIssue(false);
     try{
       const prepared=await imageToCompressedBase64(file);
       setPhoto(prepared);
       const result=await identifyProduct(prepared.imageBase64,prepared.mimeType);
       setGuess(result.guess);
       setMatches(result.matches||[]);
-      setStep(2);
-    }catch(e:any){setNotice({tone:'error',text:e.message||'We could not read that photo.'});setStep(2)}
-    finally{setIdentifying(false)}
+      if(!(result.matches||[]).length && result.guess?.name){
+        setProduct({
+          id:'',
+          name:[result.guess?.brand,result.guess?.name,result.guess?.model].filter(Boolean).join(' ').trim(),
+          brand:result.guess?.brand||'',
+          category:result.guess?.category||'',
+          image:null
+        });
+      }
+      setStep(3);
+    }catch(e:any){
+      setNotice({tone:'error',text:e.message||'We could not identify that photo. You can still enter the product name yourself.'});
+      setStep(3);
+    }finally{setIdentifying(false)}
   };
 
-  const useGuess=()=>setProduct({id:'',name:[guess?.brand,guess?.name,guess?.model].filter(Boolean).join(' ').trim()||custom,brand:guess?.brand||'',category:guess?.category||'',image:null});
+  const useGuess=()=>setProduct({
+    id:'',
+    name:[guess?.brand,guess?.name,guess?.model].filter(Boolean).join(' ').trim()||custom,
+    brand:guess?.brand||'',
+    category:guess?.category||'',
+    image:null
+  });
 
-  const verifyCurrent=async()=>{
-    if(ownership!=='owns_now'){setStep(4);return;}
-    setBusy('verify');setNotice(null);
-    try{const out=await verifyOwnership({productId:product?.id,productName:product?.name,brand:product?.brand,category:product?.category,image:product?.image,imageBase64:photo.imageBase64,mimeType:photo.mimeType});if(out.status==='verified'){setVerified(true);setNotice({tone:'success',text:'Confirmed. We can now treat this as a current-owner experience.'});setStep(4)}else setNotice({tone:'error',text:out.reason||out.tip||'We could not confirm this photo.'})}catch(e:any){setNotice({tone:'error',text:e.message})}finally{setBusy('')}
+  const choosePastProduct=(row:any)=>{
+    setProduct(row);
+    setCustom(row.name);
+    setCustomRows([]);
+    setNotice(null);
+    setStep(4);
+  };
+
+  const useManualPastProduct=()=>{
+    const name=custom.trim();
+    if(name.length<2)return;
+    setProduct({id:'',name,brand:'',category:'',image:null});
+    setCustomRows([]);
+    setNotice(null);
+    setStep(4);
+  };
+
+  const continueCurrentProduct=()=>{
+    if(!product)return;
+    setNotice(null);
+    setVerificationIssue(false);
+    setStep(4);
+  };
+
+  const verifyAndContinue=async()=>{
+    if(ownership==='used_before'){setStep(5);return;}
+    if(!photo || !product){setNotice({tone:'error',text:'Take a fresh product photo and confirm the product first.'});return;}
+
+    setBusy('verify');setNotice(null);setVerificationIssue(false);
+    try{
+      const out=await verifyOwnership({
+        productId:product?.id,
+        productName:product?.name,
+        brand:product?.brand,
+        category:product?.category,
+        image:product?.image,
+        imageBase64:photo.imageBase64,
+        mimeType:photo.mimeType
+      });
+
+      if(out.status==='verified'){
+        setVerified(true);
+        setNotice({tone:'success',text:'Confirmed. This will be saved as a verified current-owner experience.'});
+        setStep(5);
+      }else{
+        setVerificationIssue(true);
+        setNotice({tone:'error',text:out.reason||out.tip||'The photo does not match the product closely enough yet.'});
+      }
+    }catch(e:any){
+      setVerificationIssue(true);
+      setNotice({tone:'error',text:e.message||'We could not confirm ownership from this photo.'});
+    }finally{setBusy('')}
   };
 
   const save=async()=>{
     setBusy('save');setNotice(null);
-    try{await submitExperience({productId:product?.id,productName:product?.name,brand:product?.brand,category:product?.category,ownershipStatus:ownership,usedDuration:context.duration,usageFrequency:context.frequency,acquisitionMethod:context.acquisition,usedFor:context.usedFor,body:context.body,wouldRebuy:context.wouldRebuy});setStep(5);setNotice({tone:'success',text:'You added something useful. This experience can become more valuable as you update it over time.'});const s=await getSummary();setSummary(s)}catch(e:any){setNotice({tone:'error',text:e.message})}finally{setBusy('')}
+    try{
+      await submitExperience({
+        productId:product?.id,
+        productName:product?.name,
+        brand:product?.brand,
+        category:product?.category,
+        ownershipStatus:ownership,
+        usedDuration:context.duration,
+        usageFrequency:context.frequency,
+        acquisitionMethod:context.acquisition,
+        usedFor:context.usedFor,
+        body:context.body,
+        wouldRebuy:context.wouldRebuy
+      });
+      setStep(6);
+      setNotice({tone:'success',text:'You added something useful. This experience can become more valuable as you update it over time.'});
+      const s=await getSummary();setSummary(s);
+    }catch(e:any){setNotice({tone:'error',text:e.message})}
+    finally{setBusy('')}
   };
 
-  return <Shell go={go} active="unmask" summary={summary}>
-    <PageIntro kicker="UNMASK A PRODUCT" title={step===1?'Start with what’s in front of you.':'Let’s uncover it.'} body={step===1?'Take a fresh photo of the product. We’ll help work out what it is, then you tell us what living with it was actually like.':'One step at a time — no long form to fight through.'} />
-    <div className="step-dots">{[1,2,3,4,5].map(n=><span key={n} className={n<=step?'on':''}>{n<step?<FA name="check"/>:n}</span>)}</div>
+  const reset=()=>{
+    setStep(1);setOwnership('');setPhoto(null);setGuess(null);setMatches([]);setProduct(null);setCustom('');
+    setContext({duration:'',frequency:'',acquisition:'',usedFor:'',body:'',wouldRebuy:null});
+    setVerified(false);setVerificationIssue(false);setNotice(null);
+  };
 
-    {step===1&&<section className="camera-first">
-      <div className="camera-orbit"><FA name="camera"/></div><h2>Show us the product.</h2><p>Use your camera so we can start with the actual thing you’re talking about.</p>
-      <label className="camera-cta"><FA name="camera"/> {identifying?'Looking at the product…':'Take product photo'}<input type="file" accept="image/*" capture="environment" onChange={e=>takePhoto(e.target.files?.[0]||null)}/></label>
+  const progress=ownership==='used_before'
+    ? ({1:1,2:2,4:3,5:4,6:4} as any)[step] || 1
+    : ({1:1,2:2,3:3,4:4,5:5,6:5} as any)[step] || 1;
+  const total=ownership==='used_before'?4:5;
+
+  return <Shell go={go} active="unmask" summary={summary}>
+    <PageIntro
+      kicker="UNMASK A PRODUCT"
+      title={step===1?'First, how do you know the product?':step===2&&ownership==='owns_now'?'Show us the product you have.':step===2?'Find the product you used.':'Let’s build your experience.'}
+      body={step===1?'This decides the right path. Current owners prove possession with a fresh photo. Past users can simply find or enter the product they used.':ownership==='owns_now'?'We’ll identify the item from your photo, then you confirm the closest match.':'Search for the product, choose a match, or enter the name yourself.'}
+    />
+
+    {step<6&&<div className="flow-progress"><span>Step {progress} of {total}</span><div><i style={{width:(progress/total*100)+'%'}}/></div></div>}
+
+    {step===1&&<section className="relationship-stage">
+      <button onClick={()=>chooseRelationship('owns_now')}>
+        <span className="relationship-icon"><FA name="box-open"/></span>
+        <div><b>I have the product with me</b><small>You’ll take a fresh photo so we can identify it and confirm you currently have it.</small></div>
+        <FA name="arrow-right"/>
+      </button>
+      <button onClick={()=>chooseRelationship('used_before')}>
+        <span className="relationship-icon"><FA name="clock-rotate-left"/></span>
+        <div><b>I used this product before</b><small>No live photo needed. Search for the product or enter its name manually.</small></div>
+        <FA name="arrow-right"/>
+      </button>
     </section>}
 
-    {step===2&&<section className="identify-stage">
+    {step===2&&ownership==='owns_now'&&<section className="camera-first">
+      <div className="camera-orbit"><FA name="camera"/></div>
+      <h2>Take a fresh photo.</h2>
+      <p>Use the actual product in front of you. We’ll use the photo to identify it and confirm current possession.</p>
+      <label className="camera-cta"><FA name="camera"/> {identifying?'Looking at the product…':'Take product photo'}<input type="file" accept="image/*" capture="environment" onChange={e=>takePhoto(e.target.files?.[0]||null)}/></label>
+      <button className="text-btn back-link" onClick={()=>setStep(1)}><FA name="arrow-left"/> Change answer</button>
+    </section>}
+
+    {step===2&&ownership==='used_before'&&<section className="identify-stage">
+      <div className="identify-copy"><span className="eyebrow">FIND YOUR PRODUCT</span><h2>What did you use?</h2><p>Search for it. If it doesn’t appear, enter the name yourself and continue.</p></div>
+      <div className="custom-search">
+        <input value={custom} onChange={e=>{setCustom(e.target.value);setProduct(null)}} placeholder="Type the product name…" autoFocus/>
+        {!!customRows.length&&<div className="custom-results">{customRows.map(r=><button key={(r.id||'')+r.name} onClick={()=>choosePastProduct(r)}><b>{r.name}</b><small>{[r.brand,r.category].filter(Boolean).join(' · ')}</small></button>)}</div>}
+      </div>
+      <button className="btn solid full" disabled={custom.trim().length<2} onClick={useManualPastProduct}>Use “{custom.trim()||'this name'}” <FA name="arrow-right"/></button>
+      <button className="text-btn back-link" onClick={()=>setStep(1)}><FA name="arrow-left"/> Change answer</button>
+    </section>}
+
+    {step===3&&ownership==='owns_now'&&<section className="identify-stage">
       {photo?.preview&&<img className="photo-preview" src={photo.preview} alt="Product you photographed"/>}
-      <div className="identify-copy"><span className="eyebrow">DOES THIS LOOK RIGHT?</span><h2>We think it may be…</h2><p>Pick the closest match. If we missed it, type the name yourself.</p></div>
+      <div className="identify-copy"><span className="eyebrow">CONFIRM THE PRODUCT</span><h2>Which one is it?</h2><p>Choose the closest match. If none is right, enter the product name yourself.</p></div>
       <div className="match-list">
         {matches.map(r=><button key={(r.id||'')+r.name} className={product?.name===r.name?'selected':''} onClick={()=>setProduct(r)}>{r.image?<img src={r.image} alt=""/>:<span className="match-icon"><FA name="box"/></span>}<div><b>{r.name}</b><small>{[r.brand,r.category].filter(Boolean).join(' · ')}</small></div><FA name="circle-check"/></button>)}
         {!matches.length&&guess?.name&&<button className={product?'selected':''} onClick={useGuess}><span className="match-icon"><FA name="wand-magic-sparkles"/></span><div><b>{[guess.brand,guess.name,guess.model].filter(Boolean).join(' ')}</b><small>{guess.category}</small></div><FA name="circle-check"/></button>}
       </div>
-      <div className="custom-search"><input value={custom} onChange={e=>setCustom(e.target.value)} placeholder="Not there? Type the product name…" />{!!customRows.length&&<div className="custom-results">{customRows.map(r=><button key={(r.id||'')+r.name} onClick={()=>{setProduct(r);setCustom(r.name);setCustomRows([])}}><b>{r.name}</b><small>{[r.brand,r.category].filter(Boolean).join(' · ')}</small></button>)}</div>}</div>
-      <button className="btn solid full" disabled={!product} onClick={()=>setStep(3)}>Yes, that’s it <FA name="arrow-right"/></button>
-    </section>}
-
-    {step===3&&<section className="story-card">
-      <span className="eyebrow">YOUR EXPERIENCE</span><h2>How do you know this product?</h2>
-      <div className="choice-two"><button className={ownership==='owns_now'?'selected':''} onClick={()=>setOwnership('owns_now')}><FA name="box-open"/> I have it with me</button><button className={ownership==='used_before'?'selected':''} onClick={()=>setOwnership('used_before')}><FA name="clock-rotate-left"/> I used it before</button></div>
-      <Select icon="clock" value={context.duration} onChange={(v:any)=>setContext({...context,duration:v})}>{durations.map(([v,l])=><option value={v} key={v}>{l}</option>)}</Select>
-      <Select icon="repeat" value={context.frequency} onChange={(v:any)=>setContext({...context,frequency:v})}>{frequencies.map(([v,l])=><option value={v} key={v}>{l}</option>)}</Select>
-      <Select icon="basket-shopping" value={context.acquisition} onChange={(v:any)=>setContext({...context,acquisition:v})}>{acquisition.map(([v,l])=><option value={v} key={v}>{l}</option>)}</Select>
-      <button className="btn solid full" disabled={!context.duration||!context.frequency||!context.acquisition||busy==='verify'} onClick={verifyCurrent}>{busy==='verify'?'Checking the photo…':ownership==='owns_now'?'Continue & confirm I have it':'Continue'} <FA name="arrow-right"/></button>
-      {notice&&<Notice tone={notice.tone}>{notice.text}</Notice>}
+      <div className="custom-search">
+        <input value={custom} onChange={e=>setCustom(e.target.value)} placeholder="Not listed? Enter the product name…"/>
+        {!!customRows.length&&<div className="custom-results">{customRows.map(r=><button key={(r.id||'')+r.name} onClick={()=>{setProduct(r);setCustom(r.name);setCustomRows([])}}><b>{r.name}</b><small>{[r.brand,r.category].filter(Boolean).join(' · ')}</small></button>)}</div>}
+      </div>
+      {custom.trim().length>=2&&!product&&<button className="btn ghost full" onClick={()=>setProduct({id:'',name:custom.trim(),brand:guess?.brand||'',category:guess?.category||'',image:null})}>Use this product name</button>}
+      <button className="btn solid full" disabled={!product} onClick={continueCurrentProduct}>That’s the product <FA name="arrow-right"/></button>
+      <button className="text-btn back-link" onClick={()=>setStep(2)}><FA name="camera"/> Retake photo</button>
     </section>}
 
     {step===4&&<section className="story-card">
+      <span className="eyebrow">YOUR EXPERIENCE</span>
+      <h2>{product?.name||'Your product'}</h2>
+      <p className="product-context-line">{ownership==='owns_now'?'Current owner — your photo will be checked before this is marked verified.':'Past user — this will be clearly labelled as a past-user experience.'}</p>
+      <Select icon="clock" value={context.duration} onChange={(v:any)=>setContext({...context,duration:v})}>{durations.map(([v,l])=><option value={v} key={v}>{l}</option>)}</Select>
+      <Select icon="repeat" value={context.frequency} onChange={(v:any)=>setContext({...context,frequency:v})}>{frequencies.map(([v,l])=><option value={v} key={v}>{l}</option>)}</Select>
+      <Select icon="basket-shopping" value={context.acquisition} onChange={(v:any)=>setContext({...context,acquisition:v})}>{acquisition.map(([v,l])=><option value={v} key={v}>{l}</option>)}</Select>
+      <button className="btn solid full" disabled={!context.duration||!context.frequency||!context.acquisition||busy==='verify'} onClick={verifyAndContinue}>{busy==='verify'?'Confirming your photo…':ownership==='owns_now'?'Confirm possession & continue':'Continue'} <FA name="arrow-right"/></button>
+      {notice&&<Notice tone={notice.tone}>{notice.text}</Notice>}
+      {verificationIssue&&ownership==='owns_now'&&<div className="verification-actions">
+        <button className="btn ghost" onClick={()=>{setNotice(null);setVerificationIssue(false);setStep(3)}}><FA name="pen"/> Change product</button>
+        <button className="btn ghost" onClick={()=>{setNotice(null);setVerificationIssue(false);setStep(2)}}><FA name="camera"/> Retake photo</button>
+      </div>}
+    </section>}
+
+    {step===5&&<section className="story-card">
       <span className="eyebrow">WHAT WAS IT REALLY LIKE?</span><h2>Tell the part another buyer needs to hear.</h2>
+      {ownership==='owns_now'&&verified&&<div className="verified-strip"><FA name="circle-check"/><span>Current possession confirmed</span></div>}
       <Field icon="bullseye" value={context.usedFor} onChange={(v:any)=>setContext({...context,usedFor:v})} placeholder="What did you use it for?" />
       <textarea className="big-story" value={context.body} onChange={e=>setContext({...context,body:e.target.value})} placeholder="What changed? When did you notice it? What worked, failed, surprised you, or made you stop?" />
       <div className="rebuy"><span>Would you buy or use it again?</span><div><button className={context.wouldRebuy===true?'selected':''} onClick={()=>setContext({...context,wouldRebuy:true})}>Yes</button><button className={context.wouldRebuy===false?'selected':''} onClick={()=>setContext({...context,wouldRebuy:false})}>No</button></div></div>
       <button className="btn solid full" disabled={context.body.trim().length<8||busy==='save'} onClick={save}>{busy==='save'?'Saving…':'Add my experience'} <FA name="arrow-right"/></button>
     </section>}
 
-    {step===5&&<section className="celebrate"><FA name="circle-check"/><h2>You left something useful behind.</h2><p>Your experience is now part of what future buyers can learn from. If your experience changes later, you can add another update.</p><button className="btn solid" onClick={()=>{setStep(1);setPhoto(null);setGuess(null);setMatches([]);setProduct(null);setCustom('');setContext({duration:'',frequency:'',acquisition:'',usedFor:'',body:'',wouldRebuy:null});setVerified(false);setNotice(null)}}>Unmask another product</button></section>}
-    {notice&&step!==3&&<Notice tone={notice.tone}>{notice.text}</Notice>}
+    {step===6&&<section className="celebrate"><FA name="circle-check"/><h2>You left something useful behind.</h2><p>Your experience is now part of what future buyers can learn from. If your experience changes later, you can add another update.</p><button className="btn solid" onClick={reset}>Unmask another product</button></section>}
+    {notice&&step!==4&&<Notice tone={notice.tone}>{notice.text}</Notice>}
   </Shell>;
 }
 
