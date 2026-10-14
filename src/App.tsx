@@ -561,29 +561,52 @@ function RankCard({ title, rows=[], label, count }: any) {
 
 function Trends({ go, session }: any) {
   const [trends,setTrends]=useState<any>({categories:[],products:[],total_votes:0,total_suggestions:0});
+  const [feed,setFeed]=useState<any[]>([]);
+  const [stats,setStats]=useState<any>({unmasked_today:0,unmasked_total:0,unmaskers_total:0,category_votes:0});
   const [summary,setSummary]=useState<any>(null);
 
   const refresh=()=>{
-    getLaunchTrends().then(setTrends).catch(()=>undefined);
+    Promise.all([getLaunchTrends(),getCommunityFeed(40),getCommunityStats()]).then(([t,f,st])=>{setTrends(t);setFeed(f);setStats(st)}).catch(()=>undefined);
     if(session)getSummary().then(setSummary).catch(()=>undefined);
   };
 
   useEffect(()=>{
     refresh();
-    const channel=supabase.channel('launch-trends-live')
+    const channel=supabase.channel('unmask-live-page')
+      .on('postgres_changes',{event:'*',schema:'public',table:'ownership_notes'},refresh)
       .on('postgres_changes',{event:'*',schema:'public',table:'launch_category_votes'},refresh)
       .on('postgres_changes',{event:'*',schema:'public',table:'product_suggestions'},refresh)
       .subscribe();
     return()=>{supabase.removeChannel(channel)};
   },[session]);
 
+  const like=async(item:any)=>{
+    if(!session) return go('auth');
+    try{
+      const result=await toggleUnmaskLike(item.id);
+      setFeed(rows=>rows.map(x=>x.id===item.id?{...x,likes:result.likes,liked_by_me:result.liked}:x));
+    }catch{}
+  };
+
   const content=<>
-    <PageIntro kicker="LIVE COMMUNITY TREND" title="What people want Unmask to build and uncover." body="This board is powered by real category votes and real product requests. Open any category to see everything people are asking for inside it."/>
-    <div className="trend-summary-strip"><div><span className="live-dot"/><b>Live board</b></div><span>{trends.total_votes||0} category votes</span><span>{trends.total_suggestions||0} product requests</span></div>
+    <PageIntro kicker="UNMASK LIVE" title="See what the community is revealing." body="Real people. Real products. Real experiences — plus the live vote for what Unmask should build first."/>
+
+    <section className="live-overview">
+      <div><span className="live-dot"/><strong>{stats.unmasked_today||0}</strong><small>unmasked today</small></div>
+      <div><strong>{stats.unmaskers_total||0}</strong><small>Unmaskers</small></div>
+      <div><strong>{trends.total_votes||0}</strong><small>category votes</small></div>
+      <div><strong>{trends.total_suggestions||0}</strong><small>product requests</small></div>
+    </section>
+
+    <section className="community-now trends-community">
+      <div className="section-head compact"><div><div className="live-label"><span className="live-dot"/><b>RECENT UNMASKINGS</b></div><h2>What people have been through with their products.</h2></div></div>
+      <CommunityFeed items={feed} onLike={like} publicView={!session}/>
+    </section>
+
     <LiveTrendBoard data={trends} go={go} full/>
   </>;
 
-  return session?<Shell go={go} active="trends" summary={summary}>{content}</Shell>:<main className="landing"><header className="site-head"><Brand/><button className="btn solid" onClick={()=>go('auth')}>Join / Log in</button></header><div className="public-trends">{content}</div></main>;
+  return session?<Shell go={go} active="trends" summary={summary}>{content}</Shell>:<main className="landing"><header className="site-head simple-head"><Brand/><button className="btn solid" onClick={()=>go('auth')}>Join the Unmaskers</button></header><div className="public-trends">{content}</div></main>;
 }
 
 function Suggest({ go }: any) {
