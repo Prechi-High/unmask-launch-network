@@ -357,7 +357,8 @@ function Unmask({ go }: any) {
 
   useEffect(()=>{getSummary().then(setSummary)},[]);
   useEffect(()=>{
-    if(step!==2 || ownership!=='used_before' || custom.trim().length<2){setCustomRows([]);return;}
+    const canSearch=(ownership==='used_before'&&step===2)||(ownership==='owns_now'&&step===3);
+    if(!canSearch || custom.trim().length<2){setCustomRows([]);return;}
     const t=setTimeout(()=>searchProducts(custom).then(setCustomRows).catch(()=>setCustomRows([])),350);
     return()=>clearTimeout(t);
   },[custom,step,ownership]);
