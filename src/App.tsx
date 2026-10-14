@@ -10,6 +10,7 @@ import {
   getCommunityFeed,
   getCommunityStats,
   getMyUnmaskerMission,
+  getBuildVisionState,
   listCategories,
   rewardRules,
   submitExperience,
@@ -374,6 +375,96 @@ function CategoryVoteModal({ categories, trends, currentVote, onClose, onVote, b
   </div>;
 }
 
+
+
+function Countdown({ endsAt }:any) {
+  const [left,setLeft]=useState({days:0,hours:0,minutes:0,seconds:0,ended:false});
+
+  useEffect(()=>{
+    if(!endsAt) return;
+    const tick=()=>{
+      const diff=new Date(endsAt).getTime()-Date.now();
+      if(diff<=0){setLeft({days:0,hours:0,minutes:0,seconds:0,ended:true});return;}
+      setLeft({
+        days:Math.floor(diff/86400000),
+        hours:Math.floor((diff%86400000)/3600000),
+        minutes:Math.floor((diff%3600000)/60000),
+        seconds:Math.floor((diff%60000)/1000),
+        ended:false
+      });
+    };
+    tick();
+    const timer=setInterval(tick,1000);
+    return()=>clearInterval(timer);
+  },[endsAt]);
+
+  if(!endsAt) return <div className="vote-countdown waiting"><FA name="clock"/><span>Voting date will be announced</span></div>;
+  if(left.ended) return <div className="vote-countdown ended"><FA name="flag-checkered"/><span>Voting has ended</span></div>;
+
+  return <div className="vote-countdown">
+    <div><strong>{left.days}</strong><span>days</span></div>
+    <div><strong>{String(left.hours).padStart(2,'0')}</strong><span>hrs</span></div>
+    <div><strong>{String(left.minutes).padStart(2,'0')}</strong><span>min</span></div>
+    <div><strong>{String(left.seconds).padStart(2,'0')}</strong><span>sec</span></div>
+  </div>;
+}
+
+const BUILD_STEPS=[
+  ['voting','Vote','Unmaskers choose what we should build first.'],
+  ['selecting','Selected','We lock the category for this build round.'],
+  ['building','Building','We build the deep unmasking experience for it.'],
+  ['testing','Testing','Unmaskers get first access and help us test it.'],
+  ['live','Live','The category opens for full Unmask searches.']
+];
+
+function BuildRoadmap({ buildState, currentVote, onVote, compact=false }:any) {
+  const round=buildState?.round||{};
+  const phase=round.phase||'voting';
+  const activeIndex=Math.max(0,BUILD_STEPS.findIndex(([key])=>key===phase));
+  const selected=buildState?.categories?.find((c:any)=>c.id===round.selected_category_id);
+
+  return <section className={'build-vision '+(compact?'compact':'')}>
+    <div className="build-vision-top">
+      <div>
+        <span className="build-kicker"><FA name="hammer"/> WE ARE BUILDING UNMASK WITH YOU</span>
+        <h2>We’re building the tool Unmaskers will use before they buy.</h2>
+        <p>Take a picture of a product. Unmask what people actually experienced. Make a better buying decision. We’re building that experience category by category so every one can go deep.</p>
+      </div>
+      <div className="future-tool-card">
+        <span><FA name="camera"/></span>
+        <div><b>Picture a product</b><small>See what real users discovered before you spend.</small></div>
+      </div>
+    </div>
+
+    <div className="build-why">
+      <div><FA name="people-group"/><b>Your unmaskings are not random posts.</b><span>They are helping us learn what matters inside each product category.</span></div>
+      <div><FA name="flask"/><b>You’ll be among the first testers.</b><span>The community helping shape this gets first access when a category reaches testing.</span></div>
+      <div><FA name="layer-group"/><b>You decide where we start.</b><span>Vote for the category you most want the full Unmask experience built for first.</span></div>
+    </div>
+
+    <div className="build-roadmap">
+      {BUILD_STEPS.map(([key,label,body],i)=><article key={key} className={(i<activeIndex?'done ':'')+(i===activeIndex?'active ':'')}>
+        <span className="roadmap-node">{i<activeIndex?<FA name="check"/>:i+1}</span>
+        <div><b>{label}</b><small>{body}</small></div>
+      </article>)}
+    </div>
+
+    <div className="build-round-card">
+      <div className="round-copy">
+        <span className="eyebrow">{phase==='voting'?'CURRENT ROUND — VOTING IS OPEN':'CURRENT BUILD ROUND'}</span>
+        <h3>{selected?selected.name+' is moving forward':'Which category should we build first?'}</h3>
+        <p>{phase==='voting'?'Cast your vote before the round closes. The winning signal helps decide where the first deep Unmask experience goes.':'Follow the category from selection through build, testing and launch.'}</p>
+        {currentVote&&phase==='voting'&&<div className="vote-status"><FA name="circle-check"/>Your vote: <b>{currentVote}</b></div>}
+        {phase==='voting'&&<button className="btn solid" onClick={onVote}>{currentVote?'Change my vote':'Vote for a category'} <FA name="arrow-right"/></button>}
+      </div>
+      <div className="round-timer">
+        <span>{phase==='voting'?'Voting closes in':'Current stage'}</span>
+        {phase==='voting'?<Countdown endsAt={round.voting_ends_at}/>:<strong>{BUILD_STEPS[activeIndex]?.[1]||'Building'}</strong>}
+        <small>{buildState?.experiences_gathered||0} real product experiences already gathered by Unmaskers</small>
+      </div>
+    </div>
+  </section>;
+}
 
 function CommunityFeed({ items=[], onLike, compact=false, publicView=false }:any) {
   const [open,setOpen]=useState<string|null>(null);
