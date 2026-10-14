@@ -70,3 +70,15 @@ export async function broadcastNotification(title:string,body:string,link='/?vie
   if(error) throw error;
   return Number(data||0);
 }
+
+
+export async function sendNotificationToUsers(userIds:string[],title:string,body:string,link='/?view=dashboard'){
+  const { data, error } = await supabase.rpc('admin_send_notification_to_users',{
+    p_user_ids:userIds,
+    p_title:title,
+    p_body:body,
+    p_link:link
+  });
+  if(error) throw error;
+  return Number(data||0);
+}
