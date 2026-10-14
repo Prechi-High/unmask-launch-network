@@ -131,3 +131,28 @@ export async function rewardRules() {
   if (error) throw error;
   return data || [];
 }
+
+
+export async function getCommunityFeed(limit = 30) {
+  const { data, error } = await supabase.rpc('get_unmask_community_feed', { p_limit: limit });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function getCommunityStats() {
+  const { data, error } = await supabase.rpc('get_unmask_community_stats');
+  if (error) throw error;
+  return data || { unmasked_today: 0, unmasked_total: 0, unmaskers_total: 0, active_unmaskers_today: 0, category_votes: 0 };
+}
+
+export async function getMyUnmaskerMission() {
+  const { data, error } = await supabase.rpc('get_my_unmasker_mission');
+  if (error) throw error;
+  return data || { products_unmasked: 0, mission_target: 3, category_voted: false, social_followed: 0 };
+}
+
+export async function toggleUnmaskLike(noteId: string) {
+  const { data, error } = await supabase.rpc('toggle_unmask_like', { p_note_id: noteId });
+  if (error) throw error;
+  return data;
+}
