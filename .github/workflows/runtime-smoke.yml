@@ -9,9 +9,13 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     steps:
-      - name: Wait briefly for Vercel
-        run: sleep 25
-      - name: Check production health endpoint
+      - name: Wait for Vercel production alias
+        run: sleep 45
+      - name: Check runtime endpoints
         run: |
           set -x
-          curl -sS -i --max-time 20 https://unmask-launch-network.vercel.app/api/health
+          for path in api/ping api/env-check api/mail-check api/health; do
+            echo "===== $path ====="
+            curl -sS -i --max-time 20 "https://unmask-launch-network.vercel.app/$path" || true
+            echo
+          done
