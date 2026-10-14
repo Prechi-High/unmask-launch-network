@@ -1,0 +1,17 @@
+name: Production smoke check
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait briefly for Vercel
+        run: sleep 25
+      - name: Check production health endpoint
+        run: |
+          set -x
+          curl -sS -i --max-time 20 https://unmask-launch-network.vercel.app/api/health
