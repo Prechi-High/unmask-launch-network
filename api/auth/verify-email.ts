@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { admin, hashCode, json, logError, normalizeEmail } from '../_lib/server';
+import { admin, hashCode, json, logError, normalizeEmail } from '../../lib/server';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return json(res, 405, { error: 'Method not allowed.' });
