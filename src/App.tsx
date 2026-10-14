@@ -619,7 +619,8 @@ function BuildRoadmap({ buildState, currentVote, onVote, compact=false }:any) {
 }
 
 function CommunityFeed({ items=[], onLike, compact=false, publicView=false }:any) {
-  const [open,setOpen]=useState<string|null>(null);
+  const initialPost=new URLSearchParams(window.location.search).get('post');
+  const [open,setOpen]=useState<string|null>(initialPost);
 
   if(!items.length) return <div className="community-empty"><div className="community-empty-mark">U</div><div><b>The first Unmaskers are getting started.</b><span>When someone shares a product experience, it will appear here.</span></div></div>;
 
@@ -648,7 +649,9 @@ function CommunityFeed({ items=[], onLike, compact=false, publicView=false }:any
 
         <div className="post-actions">
           <button className={item.liked_by_me?'liked':''} disabled={publicView} onClick={()=>onLike?.(item)}><FA name="heart"/><span>{item.likes||0}</span>{!publicView&&<small>{item.liked_by_me?'Helpful':'That helped'}</small>}</button>
-          {!publicView&&<button onClick={()=>navigator.share?.({title:'Unmasked: '+item.product_name,text:(item.author_name||'An Unmasker')+' unmasked '+item.product_name,url:window.location.href}).catch(()=>undefined)}><FA name="share-nodes"/><small>Share</small></button>}
+          <button onClick={()=>shareNative(item).catch(()=>undefined)}><FA name="share-nodes"/><small>Share</small></button>
+          <button onClick={()=>shareWhatsApp(item)}><i className="fa-brands fa-whatsapp"/><small>Status / WhatsApp</small></button>
+          <button onClick={()=>copyUnmaskLink(item).catch(()=>undefined)}><FA name="link"/><small>Copy</small></button>
         </div>
       </article>
     })}
@@ -717,11 +720,16 @@ function Dashboard({ go }: any) {
     }catch(err:any){setNotice({tone:'error',text:err.message})}
   };
 
-  const invite=async()=>{
+  const inviteShare=async(mode:'native'|'whatsapp'|'copy'='native')=>{
     if(!summary?.referralCode)return;
     const link=window.location.origin+'?ref='+summary.referralCode;
-    try{await navigator.clipboard.writeText(link);setNotice({tone:'success',text:'Invite link copied. Bring another Unmasker in.'})}
-    catch{window.prompt('Copy your invite link',link)}
+    const text='We’re building Unmask together — a community that reveals what products are really like before people buy. Join as an Unmasker and unmask something you’ve used.\n\n'+link;
+    try{
+      if(mode==='whatsapp') return window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank','noopener,noreferrer');
+      if(mode==='native' && navigator.share) return await navigator.share({title:'Join the Unmaskers',text,url:link});
+      await navigator.clipboard.writeText(text);
+      setNotice({tone:'success',text:'Invite copied. Send it to another Unmasker.'});
+    }catch{}
   };
 
   const missionDone=Math.min(Number(mission.products_unmasked||0),Number(mission.mission_target||3));
@@ -750,7 +758,16 @@ function Dashboard({ go }: any) {
       <div className="mission-track">{Array.from({length:missionTarget}).map((_,i)=><span key={i} className={i<missionDone?'done':''}>{i<missionDone?<FA name="check"/>:i+1}</span>)}</div>
       <div className="mission-actions">
         <button className="btn solid" onClick={()=>go('unmask')}>{missionDone>=missionTarget?'Unmask another one':'Continue the mission'} <FA name="arrow-right"/></button>
-        <button className="text-btn" onClick={invite}>Invite a friend to unmask with you <FA name="user-plus"/></button>
+      </div>
+    </section>
+
+    <section className="invite-unmasker-card">
+      <div className="invite-unmasker-mark"><FA name="people-group"/></div>
+      <div className="invite-unmasker-copy"><span className="eyebrow">BRING SOMEONE INTO THE MOVEMENT</span><h3>Know someone with product stories?</h3><p>Invite them to unmask what they’ve used. The more real experiences the community leaves behind, the stronger Unmask becomes.</p></div>
+      <div className="invite-share-actions">
+        <button className="btn solid" onClick={()=>inviteShare('native')}><FA name="share-nodes"/> Share invite</button>
+        <button className="btn ghost" onClick={()=>inviteShare('whatsapp')}><i className="fa-brands fa-whatsapp"/> WhatsApp</button>
+        <button className="btn ghost" onClick={()=>inviteShare('copy')}><FA name="link"/> Copy</button>
       </div>
     </section>
 
@@ -778,7 +795,7 @@ function Dashboard({ go }: any) {
     </section>
 
     <section className="social-only-rewards">
-      <div className="section-head compact"><div><span className="eyebrow">STAY CLOSE TO THE MOVEMENT</span><h2>Follow Unmask.</h2></div><small>Coins are only used here as a follow incentive.</small></div>
+      <div className="section-head compact"><div><span className="eyebrow">STAY CLOSE TO THE MOVEMENT</span><h2>Follow Unmask.</h2></div><small>Get updates as the community and build move forward.</small></div>
       <div className="social-follow-grid">
         {socialTasks.map((task:any)=><button key={task.key} className={'social-follow-card '+(task.completed?'done':'')} style={{backgroundImage:'linear-gradient(90deg,rgba(25,4,10,.88),rgba(25,4,10,.42)),url("'+TASK_IMAGES[task.key]+'")'}} onClick={()=>task.completed?undefined:social(task)}>
           <div><span><i className={'fa-brands fa-'+(task.key==='follow_x'?'x-twitter':'tiktok')}/></span><b>{task.key==='follow_x'?'Follow Unmask on X':'Follow Unmask on TikTok'}</b><small>{task.completed?'Completed':clickedTask===task.key?'Tap again after following':'Stay with the movement'}</small></div>
