@@ -311,6 +311,7 @@ function Shell({ children, go, active, summary }: any) {
     <header className="app-head">
       <Brand />
       <div className="head-right">
+        {summary?.isAdmin&&<button className="admin-entry" onClick={()=>go('admin')} title="Open Admin"><FA name="shield-halved"/></button>}
         <CoinPeek amount={summary?.coins||0}/>
         <NotificationCenter userId={summary?.userId} go={go}/>
         <span className="avatar">{summary?.displayName?.[0]?.toUpperCase() || 'U'}</span>
