@@ -123,6 +123,7 @@ export default function AdminConsole({go}:{go:(view:string)=>void}){
       <header className="admin-topbar">
         <div className="admin-title"><h1>{NAV.find(x=>x[0]===section)?.[1]}</h1><p>{section==='overview'?'Monitor. Moderate. Empower a more informed world.':'Manage live Unmask community data and platform configuration.'}</p></div>
         <div className="admin-search"><FA name="magnifying-glass"/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search products, users, requests, or anything…"/></div>
+        <button className="admin-return-user" onClick={()=>go('dashboard')} title="Return to your Unmask dashboard"><FA name="arrow-left"/><span>Return to Unmask</span></button>
         <button className="admin-bell" title={(overview.requests_pending||0)+(overview.experiences_pending||0)+(overview.collaborations_pending||0)+' items need attention'}><FA name="bell"/>{((overview.requests_pending||0)+(overview.experiences_pending||0)+(overview.collaborations_pending||0))>0&&<i/>}</button>
         <div className="admin-user"><span>{adminName[0]?.toUpperCase()}</span><div><b>{adminName}</b><small>Administrator</small></div></div>
       </header>
