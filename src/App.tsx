@@ -271,9 +271,9 @@ function NotificationCenter({ userId, go }:any){
       </div>
 
       {!pushEnabled&&<div className="push-card">
-        <span className="push-icon"><FA name="mobile-screen-button"/></span>
-        <div><b>Keep Unmask with you</b><small>Get category updates and community activity even when this page is closed.</small></div>
-        <button disabled={busy} onClick={enable}>{busy?'Turning on…':'Allow push'}</button>
+        <span className="push-icon"><FA name="bell"/></span>
+        <div><b>Don’t miss what Unmaskers are doing.</b><small>Get community activity, useful reactions and category build updates on your phone.</small></div>
+        <button disabled={busy} onClick={enable}>{busy?'Turning on…':'Enable notifications'}</button>
       </div>}
 
       {notice&&<small className="push-note">{notice}</small>}
@@ -797,7 +797,7 @@ function Dashboard({ go }: any) {
     <section className="social-only-rewards">
       <div className="section-head compact"><div><span className="eyebrow">STAY CLOSE TO THE MOVEMENT</span><h2>Follow Unmask.</h2></div><small>Get updates as the community and build move forward.</small></div>
       <div className="social-follow-grid">
-        {socialTasks.map((task:any)=><button key={task.key} className={'social-follow-card '+(task.completed?'done':'')} style={{backgroundImage:'linear-gradient(90deg,rgba(25,4,10,.88),rgba(25,4,10,.42)),url("'+TASK_IMAGES[task.key]+'")'}} onClick={()=>task.completed?undefined:social(task)}>
+        {socialTasks.map((task:any)=><button key={task.key} className={'social-follow-card '+(task.key==='follow_x'?'x-follow-banner ':'')+(task.completed?'done':'')} style={{backgroundImage:'linear-gradient(90deg,rgba(25,4,10,.88),rgba(25,4,10,.42)),url("'+TASK_IMAGES[task.key]+'")'}} onClick={()=>task.completed?undefined:social(task)}>
           <div><span><i className={'fa-brands fa-'+(task.key==='follow_x'?'x-twitter':'tiktok')}/></span><b>{task.key==='follow_x'?'Follow Unmask on X':'Follow Unmask on TikTok'}</b><small>{task.completed?'Completed':clickedTask===task.key?'Tap again after following':'Stay with the movement'}</small></div>
           <strong>{task.completed?<><FA name="check"/> Done</>:<><FA name="coins"/> +{task.coin_amount||100}</>}</strong>
         </button>)}
@@ -911,6 +911,7 @@ function Unmask({ go }: any) {
   const [busy,setBusy]=useState('');
   const [notice,setNotice]=useState<any>(null);
   const [verificationIssue,setVerificationIssue]=useState(false);
+  const [savedNoteId,setSavedNoteId]=useState<string>('');
 
   useEffect(()=>{getSummary().then(setSummary)},[]);
   useEffect(()=>{
@@ -1023,7 +1024,7 @@ function Unmask({ go }: any) {
   const save=async()=>{
     setBusy('save');setNotice(null);
     try{
-      await submitExperience({
+      const noteId=await submitExperience({
         productId:product?.id,
         productName:product?.name,
         brand:product?.brand,
@@ -1036,6 +1037,7 @@ function Unmask({ go }: any) {
         body:context.body,
         wouldRebuy:context.wouldRebuy
       });
+      setSavedNoteId(String(noteId||''));
       setStep(6);
       setNotice({tone:'success',text:'You added something useful. This experience can become more valuable as you update it over time.'});
       const s=await getSummary();setSummary(s);
@@ -1046,7 +1048,7 @@ function Unmask({ go }: any) {
   const reset=()=>{
     setStep(1);setOwnership('');setPhoto(null);setGuess(null);setMatches([]);setProduct(null);setCustom('');
     setContext({duration:'',frequency:'',acquisition:'',usedFor:'',body:'',wouldRebuy:null});
-    setVerified(false);setVerificationIssue(false);setNotice(null);
+    setVerified(false);setVerificationIssue(false);setSavedNoteId('');setNotice(null);
   };
 
   const progress=ownership==='used_before'
@@ -1134,7 +1136,38 @@ function Unmask({ go }: any) {
       <button className="btn solid full" disabled={context.body.trim().length<8||busy==='save'} onClick={save}>{busy==='save'?'Saving…':'Add my experience'} <FA name="arrow-right"/></button>
     </section>}
 
-    {step===6&&<section className="celebrate"><FA name="circle-check"/><h2>You left something useful behind.</h2><p>Your experience is now part of what future buyers can learn from. If your experience changes later, you can add another update.</p><button className="btn solid" onClick={reset}>Unmask another product</button></section>}
+    {step===6&&<section className="celebrate unmask-success">
+      <div className="success-mark"><FA name="circle-check"/></div>
+      <span className="eyebrow">UNMASKED</span>
+      <h2>You left something useful behind.</h2>
+      <p>Your experience with <b>{product?.name||'this product'}</b> can help the next person know what they’re getting into before they spend.</p>
+
+      <div className="share-after-unmask">
+        <div className="share-after-copy">
+          <span className="share-after-icon"><i className="fa-brands fa-whatsapp"/></span>
+          <div><b>Put this unmasking on your status.</b><small>Let friends see what the product was really like — and bring more Unmaskers into the movement.</small></div>
+        </div>
+        <div className="share-after-actions">
+          <button className="btn whatsapp-share" onClick={()=>shareWhatsApp({
+            id:savedNoteId,
+            author_name:summary?.displayName||'An Unmasker',
+            product_name:product?.name||'a product'
+          })}><i className="fa-brands fa-whatsapp"/> WhatsApp / Status</button>
+          <button className="btn ghost" onClick={()=>shareNative({
+            id:savedNoteId,
+            author_name:summary?.displayName||'An Unmasker',
+            product_name:product?.name||'a product'
+          }).catch(()=>undefined)}><FA name="share-nodes"/> Share elsewhere</button>
+          <button className="btn ghost" onClick={()=>copyUnmaskLink({
+            id:savedNoteId,
+            author_name:summary?.displayName||'An Unmasker',
+            product_name:product?.name||'a product'
+          }).catch(()=>undefined)}><FA name="link"/> Copy</button>
+        </div>
+      </div>
+
+      <button className="text-btn success-next" onClick={reset}>Unmask another product <FA name="arrow-right"/></button>
+    </section>}
     {notice&&step!==4&&<Notice tone={notice.tone}>{notice.text}</Notice>}
   </Shell>;
 }
