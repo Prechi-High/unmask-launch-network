@@ -43,13 +43,9 @@ export async function listCategories() {
 }
 
 export async function chooseCategory(categoryId: string) {
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) throw new Error('Please log in first.');
-  await supabase.from('launch_category_votes').delete().eq('user_id', auth.user.id);
-  const { error } = await supabase.from('launch_category_votes').insert({ user_id: auth.user.id, category_id: categoryId });
+  const { data, error } = await supabase.rpc('cast_launch_category_vote', { p_category_id: categoryId });
   if (error) throw error;
-  await supabase.rpc('claim_launch_task', { p_task_key: 'choose_category' });
-  await supabase.rpc('qualify_my_launch_referral');
+  return data;
 }
 
 export async function claimTask(key: string) {
@@ -155,4 +151,10 @@ export async function toggleUnmaskLike(noteId: string) {
   const { data, error } = await supabase.rpc('toggle_unmask_like', { p_note_id: noteId });
   if (error) throw error;
   return data;
+}
+
+export async function getBuildVisionState() {
+  const { data, error } = await supabase.rpc('get_launch_build_state');
+  if (error) throw error;
+  return data || { round: null, categories: [], experiences_gathered: 0 };
 }
