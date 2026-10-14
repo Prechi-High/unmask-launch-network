@@ -24,6 +24,7 @@ import {
   verifyOwnership
 } from './data';
 import { supabase } from './supabase';
+import AdminConsole from './Admin';
 
 const FA = ({ name, className = '' }: { name: string; className?: string }) =>
   <i className={'fa-solid fa-' + name + ' ' + className} aria-hidden="true" />;
@@ -116,6 +117,7 @@ function App() {
   const [view, setView] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('post')) return 'trends';
+    if (params.get('view') === 'admin') return 'admin';
     if (params.get('view') === 'dashboard') return 'dashboard';
     const stored = localStorage.getItem('unmask_view') || 'landing';
     return stored === 'rewards' ? 'dashboard' : stored;
@@ -140,6 +142,7 @@ function App() {
 
   if (!ready) return <div className="boot"><Brand /><span>Opening Unmask…</span></div>;
   if (view === 'auth') return <Auth go={go} />;
+  if (view === 'admin') return session ? <AdminConsole go={go} /> : <Auth go={go} loginFirst />;
   if (view === 'dashboard') return session ? <Dashboard go={go} /> : <Auth go={go} loginFirst />;
   if (view === 'trends') return <Trends go={go} session={session} />;
   if (view === 'suggest') return session ? <Suggest go={go} /> : <Auth go={go} loginFirst />;
