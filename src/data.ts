@@ -6,6 +6,12 @@ export async function getPulse() {
   return data || { unmaskers: 0, categories: [], products: [], experiences: [] };
 }
 
+export async function getLaunchTrends() {
+  const { data, error } = await supabase.rpc('get_launch_trends');
+  if (error) throw error;
+  return data || { categories: [], products: [], total_votes: 0, total_suggestions: 0 };
+}
+
 export async function getSummary() {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return null;
