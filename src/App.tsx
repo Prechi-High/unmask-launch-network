@@ -372,8 +372,49 @@ function CategoryVoteModal({ categories, trends, currentVote, onClose, onVote, b
   </div>;
 }
 
+
+function CommunityFeed({ items=[], onLike, compact=false, publicView=false }:any) {
+  const [open,setOpen]=useState<string|null>(null);
+
+  if(!items.length) return <div className="community-empty"><div className="community-empty-mark">U</div><div><b>The first Unmaskers are getting started.</b><span>When someone shares a product experience, it will appear here.</span></div></div>;
+
+  return <div className={'community-feed '+(compact?'compact':'')}>
+    {items.map((item:any)=>{
+      const expanded=open===item.id;
+      const initial=(item.author_name||'U').trim().charAt(0).toUpperCase();
+      return <article className="unmask-post" key={item.id}>
+        <div className="post-top">
+          <span className="post-avatar">{initial}</span>
+          <div className="post-person"><b>{item.author_name||'An Unmasker'}</b><span>unmasked <strong>{item.product_name}</strong></span></div>
+          <span className="post-time">{new Date(item.created_at).toLocaleDateString(undefined,{month:'short',day:'numeric'})}</span>
+        </div>
+
+        <button className="post-story" onClick={()=>setOpen(expanded?null:item.id)}>
+          <div className="post-product-line"><span>UNMASKED</span><b>{item.product_name}</b>{item.brand&&<small>{item.brand}</small>}</div>
+          <p className={expanded?'expanded':''}>{item.body}</p>
+          <div className="post-context">
+            {item.used_duration&&<span><FA name="clock"/>{String(item.used_duration).replaceAll('_',' ')}</span>}
+            {item.ownership_status==='owns_now'&&<span><FA name="circle-check"/>current owner</span>}
+            {item.would_rebuy===false&&<span className="would-not"><FA name="thumbs-down"/>wouldn’t buy again</span>}
+            {item.would_rebuy===true&&<span className="would-again"><FA name="thumbs-up"/>would use again</span>}
+          </div>
+          {!compact&&<span className="read-story">{expanded?'Show less':'Read the experience'} <FA name={expanded?'chevron-up':'chevron-down'}/></span>}
+        </button>
+
+        <div className="post-actions">
+          <button className={item.liked_by_me?'liked':''} disabled={publicView} onClick={()=>onLike?.(item)}><FA name="heart"/><span>{item.likes||0}</span>{!publicView&&<small>{item.liked_by_me?'Helpful':'That helped'}</small>}</button>
+          {!publicView&&<button onClick={()=>navigator.share?.({title:'Unmasked: '+item.product_name,text:(item.author_name||'An Unmasker')+' unmasked '+item.product_name,url:window.location.href}).catch(()=>undefined)}><FA name="share-nodes"/><small>Share</small></button>}
+        </div>
+      </article>
+    })}
+  </div>;
+}
+
 function Dashboard({ go }: any) {
   const [summary,setSummary]=useState<any>(null);
+  const [stats,setStats]=useState<any>({unmasked_today:0,unmasked_total:0,unmaskers_total:0,active_unmaskers_today:0,category_votes:0});
+  const [mission,setMission]=useState<any>({products_unmasked:0,mission_target:3,category_voted:false,social_followed:0});
+  const [feed,setFeed]=useState<any[]>([]);
   const [trends,setTrends]=useState<any>({categories:[],products:[],total_votes:0,total_suggestions:0});
   const [categories,setCategories]=useState<any[]>([]);
   const [notice,setNotice]=useState<any>(null);
@@ -382,18 +423,28 @@ function Dashboard({ go }: any) {
   const [voteBusy,setVoteBusy]=useState(false);
 
   const refresh=async()=>{
-    const [s,t,c]=await Promise.all([getSummary(),getLaunchTrends(),listCategories()]);
-    setSummary(s);setTrends(t);setCategories(c);
+    const [sm,st,mi,fd,tr,ca]=await Promise.all([
+      getSummary(),getCommunityStats(),getMyUnmaskerMission(),getCommunityFeed(12),getLaunchTrends(),listCategories()
+    ]);
+    setSummary(sm);setStats(st);setMission(mi);setFeed(fd);setTrends(tr);setCategories(ca);
   };
 
   useEffect(()=>{
     refresh().catch(()=>undefined);
-    const channel=supabase.channel('launch-home-live')
+    const channel=supabase.channel('unmasker-home-live')
+      .on('postgres_changes',{event:'*',schema:'public',table:'ownership_notes'},()=>refresh())
+      .on('postgres_changes',{event:'*',schema:'public',table:'unmask_post_likes'},()=>getCommunityFeed(12).then(setFeed).catch(()=>undefined))
       .on('postgres_changes',{event:'*',schema:'public',table:'launch_category_votes'},()=>refresh())
-      .on('postgres_changes',{event:'*',schema:'public',table:'product_suggestions'},()=>refresh())
       .subscribe();
     return()=>{supabase.removeChannel(channel)};
   },[]);
+
+  const like=async(item:any)=>{
+    try{
+      const result=await toggleUnmaskLike(item.id);
+      setFeed(rows=>rows.map(x=>x.id===item.id?{...x,likes:result.likes,liked_by_me:result.liked}:x));
+    }catch(err:any){setNotice({tone:'error',text:err.message})}
+  };
 
   const pickCategory=async(id:string)=>{
     setVoteBusy(true);
@@ -401,7 +452,7 @@ function Dashboard({ go }: any) {
       await chooseCategory(id);
       await refresh();
       setShowCategoryPicker(false);
-      setNotice({tone:'success',text:'Your vote is live. You just helped shape what Unmask builds first.'});
+      setNotice({tone:'success',text:'Your vote is live. You helped decide what Unmask builds first.'});
     }catch(err:any){setNotice({tone:'error',text:err.message})}
     finally{setVoteBusy(false)}
   };
@@ -414,7 +465,7 @@ function Dashboard({ go }: any) {
     }
     try{
       await claimTask(task.key);
-      setNotice({tone:'success',text:'Task marked complete. Your Coins have been added.'});
+      setNotice({tone:'success',text:'Done. Your social follow reward has been added.'});
       setClickedTask(null);
       await refresh();
     }catch(err:any){setNotice({tone:'error',text:err.message})}
@@ -423,54 +474,80 @@ function Dashboard({ go }: any) {
   const invite=async()=>{
     if(!summary?.referralCode)return;
     const link=window.location.origin+'?ref='+summary.referralCode;
-    try{await navigator.clipboard.writeText(link);setNotice({tone:'success',text:'Your invite link is copied.'})}
+    try{await navigator.clipboard.writeText(link);setNotice({tone:'success',text:'Invite link copied. Bring another Unmasker in.'})}
     catch{window.prompt('Copy your invite link',link)}
   };
 
+  const missionDone=Math.min(Number(mission.products_unmasked||0),Number(mission.mission_target||3));
+  const missionTarget=Number(mission.mission_target||3);
   const socialTasks=summary?.tasks?.filter((t:any)=>t.key==='follow_x'||t.key==='follow_tiktok')||[];
 
   return <Shell go={go} active="dashboard" summary={summary}>
-    <section className="dash-hero">
-      <div><span className="eyebrow">WELCOME BACK{summary?.displayName?', '+summary.displayName.toUpperCase():''}</span><h1>You’re helping decide <em>what gets unmasked first.</em></h1><p>Watch the live race, cast your vote and help surface the products people most want answers about.</p></div>
-      <div className="dash-coin"><span>Your Coins</span><strong>{summary?.coins||0}</strong><small>earned from real contribution</small></div>
+    <section className="unmasker-hero">
+      <div className="unmasker-hero-copy">
+        <span className="eyebrow">YOU ARE AN UNMASKER</span>
+        <h1>What are you going to <em>unmask today?</em></h1>
+        <p>Pick a product you know. Tell people what really happened. Good, bad, broken, brilliant — reveal it.</p>
+        <button className="btn solid hero-unmask-btn" onClick={()=>go('unmask')}><FA name="camera"/> Unmask a product</button>
+      </div>
+      <div className="today-live">
+        <span className="live-dot"/><b>{stats.unmasked_today||0} unmasked today</b>
+        <small>{stats.active_unmaskers_today||0} Unmaskers have shared something today</small>
+      </div>
     </section>
 
-    <LiveTrendBoard data={trends} go={go}/>
-
-    <section className="decision-zone">
-      <div className="decision-bg">
-        <img src={categoryImage('Beauty')} alt=""/>
-        <img src={categoryImage('Tech')} alt=""/>
-        <img src={categoryImage('Home Appliances')} alt=""/>
+    <section className="first-mission">
+      <div className="mission-head">
+        <div><span className="eyebrow">YOUR FIRST MISSION</span><h2>Unmask 3 products you know.</h2><p>Look around your home. Pick products you have actually used and leave the truth behind for the next buyer.</p></div>
+        <strong>{missionDone}/{missionTarget}</strong>
       </div>
-      <div className="decision-content">
-        <div className="decision-kicker"><span className="live-dot"/><b>HELP CHOOSE WHERE UNMASK STARTS</b></div>
-        <h2>Your vote helps decide the first category we build.</h2>
-        <p>Beauty, Tech, Fashion, Gaming, Home Appliances and more are all open. Pick the one you want Unmask to unlock first.</p>
-        {summary?.voteName&&<div className="current-vote"><FA name="circle-check"/><span>Your current vote: <b>{summary.voteName}</b></span></div>}
-        <button className="btn solid" onClick={()=>setShowCategoryPicker(true)}>{summary?.voteName?'Change my vote':'Choose a category'} <FA name="arrow-right"/></button>
+      <div className="mission-track">{Array.from({length:missionTarget}).map((_,i)=><span key={i} className={i<missionDone?'done':''}>{i<missionDone?<FA name="check"/>:i+1}</span>)}</div>
+      <div className="mission-actions">
+        <button className="btn solid" onClick={()=>go('unmask')}>{missionDone>=missionTarget?'Unmask another one':'Continue the mission'} <FA name="arrow-right"/></button>
+        <button className="text-btn" onClick={invite}>Invite a friend to unmask with you <FA name="user-plus"/></button>
       </div>
-      <span className="decision-count">{categories.length} categories open</span>
     </section>
 
-    <section className="action-zone">
-      <div className="section-head compact"><div><span className="eyebrow">KEEP THE MOVEMENT GOING</span><h2>Quick ways to take part.</h2></div><span className="progress-pill">{summary?.tasks?.filter((t:any)=>t.completed).length||0}/{summary?.tasks?.length||3} done</span></div>
-      <div className="banner-grid">
-        {socialTasks.map((task:any)=><button key={task.key} className={'action-banner social-banner '+(task.completed?'completed':'')} style={{backgroundImage:'linear-gradient(90deg,rgba(25,4,10,.84),rgba(50,5,16,.42)),url("'+TASK_IMAGES[task.key]+'")'}} onClick={()=>task.completed?undefined:social(task)}>
-          <div className="banner-copy"><span className="banner-kicker"><i className={'fa-brands fa-'+(task.key==='follow_x'?'x-twitter':'tiktok')}/>{task.completed?'Completed':'Social'}</span><b>{task.key==='follow_x'?'Follow Unmask on X':'Follow us on TikTok'}</b><small>{task.key==='follow_x'?'Stay close to the latest updates.':'See unmasking content as it drops.'}</small></div>
-          <span className="coin-reward">{task.completed?<><FA name="check"/> Done</>:<><FA name="coins"/> +{task.coin_amount||100}</>}</span>
-          {!task.completed&&<span className="banner-action">{clickedTask===task.key?'I followed':'Open'} <FA name="arrow-right"/></span>}
+    <section className="community-now">
+      <div className="section-head compact">
+        <div><div className="live-label"><span className="live-dot"/><b>THE COMMUNITY IS UNMASKING</b></div><h2>What Unmaskers are revealing right now.</h2></div>
+        <span className="community-count">{stats.unmasked_total||0} experiences shared</span>
+      </div>
+      <CommunityFeed items={feed} onLike={like}/>
+    </section>
+
+    <section className="vote-mission">
+      <div className="vote-mission-image"><img src={categoryImage(summary?.voteName||'Beauty')} alt=""/></div>
+      <div className="vote-mission-copy">
+        <span className="eyebrow">YOU ALSO GET A SAY</span>
+        <h2>Which category should Unmask build first?</h2>
+        <p>Vote for the kind of products you most want the full Unmask experience to launch for.</p>
+        {summary?.voteName?<div className="vote-status"><FA name="circle-check"/>Your vote: <b>{summary.voteName}</b></div>:<div className="vote-status pending"><span className="live-dot"/>You have not voted yet.</div>}
+        <button className="btn solid" onClick={()=>setShowCategoryPicker(true)}>{summary?.voteName?'Change my vote':'Cast my vote'} <FA name="arrow-right"/></button>
+      </div>
+    </section>
+
+    <section className="simple-next">
+      <button onClick={()=>go('suggest')}>
+        <span className="simple-next-visual"><FA name="magnifying-glass"/></span>
+        <div><b>What do you want Unmask to cover next?</b><small>Tell us a product you are thinking about buying.</small></div>
+        <FA name="chevron-right"/>
+      </button>
+      <button onClick={()=>go('trends')}>
+        <span className="simple-next-visual"><FA name="bolt"/></span>
+        <div><b>See the live Unmask board</b><small>Watch category votes and the products people are asking for.</small></div>
+        <FA name="chevron-right"/>
+      </button>
+    </section>
+
+    <section className="social-only-rewards">
+      <div className="section-head compact"><div><span className="eyebrow">STAY CLOSE TO THE MOVEMENT</span><h2>Follow Unmask.</h2></div><small>Coins are only used here as a follow incentive.</small></div>
+      <div className="social-follow-grid">
+        {socialTasks.map((task:any)=><button key={task.key} className={'social-follow-card '+(task.completed?'done':'')} style={{backgroundImage:'linear-gradient(90deg,rgba(25,4,10,.88),rgba(25,4,10,.42)),url("'+TASK_IMAGES[task.key]+'")'}} onClick={()=>task.completed?undefined:social(task)}>
+          <div><span><i className={'fa-brands fa-'+(task.key==='follow_x'?'x-twitter':'tiktok')}/></span><b>{task.key==='follow_x'?'Follow Unmask on X':'Follow Unmask on TikTok'}</b><small>{task.completed?'Completed':clickedTask===task.key?'Tap again after following':'Stay with the movement'}</small></div>
+          <strong>{task.completed?<><FA name="check"/> Done</>:<><FA name="coins"/> +{task.coin_amount||100}</>}</strong>
         </button>)}
-
-        <button className="action-banner" style={{backgroundImage:'linear-gradient(90deg,rgba(34,8,16,.88),rgba(55,10,20,.32)),url("'+TASK_IMAGES.unmask+'")'}} onClick={()=>go('unmask')}>
-          <div className="banner-copy"><span className="banner-kicker"><FA name="camera"/>Contribute</span><b>Unmask something you use</b><small>Share what the product was really like.</small></div><span className="banner-action">Start <FA name="arrow-right"/></span>
-        </button>
-
-        <button className="action-banner" style={{backgroundImage:'linear-gradient(90deg,rgba(34,8,16,.88),rgba(55,10,20,.28)),url("'+TASK_IMAGES.suggest+'")'}} onClick={()=>go('suggest')}>
-          <div className="banner-copy"><span className="banner-kicker"><FA name="magnifying-glass"/>Shape what’s next</span><b>Suggest something to uncover</b><small>Tell us what you want Unmask to look into.</small></div><span className="banner-action">Suggest <FA name="arrow-right"/></span>
-        </button>
       </div>
-      <button className="invite-strip" onClick={invite}><span><FA name="user-plus"/></span><div><b>Bring another Unmasker into the build</b><small>Qualified referrals can earn Coins.</small></div><FA name="chevron-right"/></button>
     </section>
 
     {notice&&<Notice tone={notice.tone}>{notice.text}</Notice>}
