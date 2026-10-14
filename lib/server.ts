@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
-import crypto from 'node:crypto';
+import * as crypto from 'node:crypto';
 
 export function admin() {
   const url = process.env.SUPABASE_URL;
@@ -9,11 +9,11 @@ export function admin() {
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
-export function normalizeEmail(value: unknown) {
+export function normalizeEmail(value) {
   return typeof value === 'string' ? value.trim().toLowerCase() : '';
 }
 
-export async function ensureAllowedEmail(email: string) {
+export async function ensureAllowedEmail(email) {
   const domain = email.split('@')[1] || '';
   if (!domain) throw new Error('Enter a valid email address.');
   const db = admin();
@@ -26,15 +26,18 @@ export function makeCode() {
   return String(crypto.randomInt(100000, 1000000));
 }
 
-export function hashCode(code: string) {
+export function hashCode(code) {
   return crypto.createHash('sha256').update(code + (process.env.VERIFICATION_PEPPER || '')).digest('hex');
 }
 
-export async function sendVerificationEmail(to: string, code: string) {
+export async function sendVerificationEmail(to, code) {
   const from = process.env.AUTH_EMAIL_ADDRESS;
   const password = process.env.AUTH_EMAIL_APP_PASSWORD;
   if (!from || !password) throw new Error('Verification email is not configured.');
-  const transport = nodemailer.createTransport({ service: 'gmail', auth: { user: from, pass: password } });
+  const transport = nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user: from, pass: String(password).replace(/\s+/g, '') }
+  });
   await transport.sendMail({
     from: 'Unmask <' + from + '>',
     to,
@@ -44,14 +47,7 @@ export async function sendVerificationEmail(to: string, code: string) {
   });
 }
 
-export async function logError(input: {
-  source: string;
-  route?: string;
-  code?: string;
-  message: string;
-  details?: Record<string, any>;
-  userId?: string | null;
-}) {
+export async function logError(input) {
   const safeDetails = { ...(input.details || {}) };
   for (const key of ['password','token','code','serviceRole','secret','authorization']) {
     if (key in safeDetails) safeDetails[key] = '[redacted]';
@@ -69,11 +65,11 @@ export async function logError(input: {
       details: safeDetails,
       user_id: input.userId || null
     });
-  } catch (loggingError: any) {
+  } catch (loggingError) {
     console.error('[logger] failed_to_persist', loggingError?.message || loggingError);
   }
 }
 
-export function json(res: any, status: number, body: any) {
+export function json(res, status, body) {
   res.status(status).json(body);
 }
