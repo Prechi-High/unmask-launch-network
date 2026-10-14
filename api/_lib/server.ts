@@ -44,6 +44,36 @@ export async function sendVerificationEmail(to: string, code: string) {
   });
 }
 
+export async function logError(input: {
+  source: string;
+  route?: string;
+  code?: string;
+  message: string;
+  details?: Record<string, any>;
+  userId?: string | null;
+}) {
+  const safeDetails = { ...(input.details || {}) };
+  for (const key of ['password','token','code','serviceRole','secret','authorization']) {
+    if (key in safeDetails) safeDetails[key] = '[redacted]';
+  }
+
+  console.error('[' + input.source + ']', input.code || 'error', input.message, safeDetails);
+
+  try {
+    const db = admin();
+    await db.from('app_error_logs').insert({
+      source: input.source,
+      route: input.route || null,
+      code: input.code || null,
+      message: input.message,
+      details: safeDetails,
+      user_id: input.userId || null
+    });
+  } catch (loggingError: any) {
+    console.error('[logger] failed_to_persist', loggingError?.message || loggingError);
+  }
+}
+
 export function json(res: any, status: number, body: any) {
   res.status(status).json(body);
 }
