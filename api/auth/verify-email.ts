@@ -1,4 +1,5 @@
-import { admin, hashCode, json, normalizeEmail } from '../_lib/server';
+import crypto from 'node:crypto';
+import { admin, hashCode, json, logError, normalizeEmail } from '../_lib/server';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return json(res, 405, { error: 'Method not allowed.' });
@@ -37,7 +38,14 @@ export default async function handler(req: any, res: any) {
 
     return json(res, 200, { success: true });
   } catch (error: any) {
-    console.error('[verify-email]', error?.message || error);
-    return json(res, 500, { error: 'We could not verify your email right now.' });
+    const errorId = crypto.randomUUID();
+    await logError({
+      source: 'vercel-api',
+      route: '/api/auth/verify-email',
+      code: errorId,
+      message: error?.message || 'Email verification failed.',
+      details: { hasEmail: Boolean(req.body?.email) }
+    });
+    return json(res, 500, { error: 'We could not verify your email right now.', errorId });
   }
 }
