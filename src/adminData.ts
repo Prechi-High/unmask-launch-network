@@ -12,6 +12,12 @@ export async function getAdminOverview(){
   return data || {};
 }
 
+export async function getAdminSectionStats(){
+  const { data, error } = await supabase.rpc('admin_get_section_stats');
+  if(error) throw error;
+  return data || {};
+}
+
 export async function getAdminSection(section:string,limit=150){
   const { data, error } = await supabase.rpc('admin_get_console_data',{p_section:section,p_limit:limit});
   if(error) throw error;
