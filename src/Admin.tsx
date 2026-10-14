@@ -11,7 +11,8 @@ import {
   updateCollaborationStatus,
   updateExperienceStatus,
   updateRequestStatus,
-  updateRewardRule
+  updateRewardRule,
+  sendNotificationToUsers
 } from './adminData';
 import './admin.css';
 
@@ -287,38 +288,127 @@ function TrendsPage({overview}:any){
 function SettingsPage({overview,onSaved,setNotice}:any){
   const [rewards,setRewards]=useState<any[]>([]);
   const [categories,setCategories]=useState<any[]>([]);
+  const [users,setUsers]=useState<any[]>([]);
   const [phase,setPhase]=useState(overview.build_round?.phase||'voting');
   const [ends,setEnds]=useState(overview.build_round?.voting_ends_at?new Date(overview.build_round.voting_ends_at).toISOString().slice(0,16):'');
   const [selectedCategory,setSelectedCategory]=useState(overview.build_round?.selected_category_id||'');
   const [broadcast,setBroadcast]=useState({title:'',body:'',link:'/?view=dashboard'});
+  const [audience,setAudience]=useState<'all'|'single'|'group'>('all');
+  const [selectedUsers,setSelectedUsers]=useState<string[]>([]);
+  const [userSearch,setUserSearch]=useState('');
   const [busy,setBusy]=useState('');
 
-  useEffect(()=>{Promise.all([getAdminSection('rewards'),getAdminSection('categories')]).then(([r,c])=>{setRewards(r.rules||[]);setCategories(c||[])})},[]);
+  useEffect(()=>{
+    Promise.all([getAdminSection('rewards'),getAdminSection('categories'),getAdminSection('users',500)])
+      .then(([r,c,u])=>{
+        setRewards(r.rules||[]);
+        setCategories(c||[]);
+        setUsers(Array.isArray(u)?u:[]);
+      });
+  },[]);
+
+  const visibleUsers=useMemo(()=>{
+    const q=userSearch.trim().toLowerCase();
+    if(!q)return users;
+    return users.filter((u:any)=>[u.display_name,u.email,u.country,u.region].filter(Boolean).join(' ').toLowerCase().includes(q));
+  },[users,userSearch]);
 
   const saveRewards=async()=>{
     setBusy('rewards');
-    try{for(const r of rewards) await updateRewardRule(r.key,Number(r.coin_amount||0),Boolean(r.active));setNotice('Reward settings saved.');}
-    finally{setBusy('')}
+    try{
+      for(const r of rewards) await updateRewardRule(r.key,Number(r.coin_amount||0),Boolean(r.active));
+      setNotice('Reward settings saved.');
+    }finally{setBusy('')}
   };
+
   const saveBuild=async()=>{
     setBusy('build');
-    try{await updateBuildRound(phase,ends?new Date(ends).toISOString():null,selectedCategory||null);setNotice('Build round updated. Community notifications will follow stage changes.');onSaved();}
-    finally{setBusy('')}
+    try{
+      await updateBuildRound(phase,ends?new Date(ends).toISOString():null,selectedCategory||null);
+      setNotice('Build round updated. Community notifications will follow stage changes.');
+      onSaved();
+    }finally{setBusy('')}
   };
+
+  const toggleUser=(id:string)=>{
+    if(audience==='single'){
+      setSelectedUsers([id]);
+      return;
+    }
+    setSelectedUsers(xs=>xs.includes(id)?xs.filter(x=>x!==id):[...xs,id]);
+  };
+
+  const changeAudience=(next:'all'|'single'|'group')=>{
+    setAudience(next);
+    setSelectedUsers([]);
+    setUserSearch('');
+  };
+
   const sendBroadcast=async()=>{
     setBusy('broadcast');
-    try{const count=await broadcastNotification(broadcast.title,broadcast.body,broadcast.link);setNotice('Notification sent to '+count+' Unmaskers.');setBroadcast({title:'',body:'',link:'/?view=dashboard'});}
-    finally{setBusy('')}
+    try{
+      let count=0;
+      if(audience==='all'){
+        count=await broadcastNotification(broadcast.title,broadcast.body,broadcast.link);
+      }else{
+        count=await sendNotificationToUsers(selectedUsers,broadcast.title,broadcast.body,broadcast.link);
+      }
+
+      const label=audience==='all'?'all Unmaskers':audience==='single'?'the selected Unmasker':'the selected group';
+      setNotice('Notification sent to '+count+' '+(count===1?'person':'people')+' in '+label+'.');
+      setBroadcast({title:'',body:'',link:'/?view=dashboard'});
+      setSelectedUsers([]);
+    }finally{setBusy('')}
   };
+
+  const recipientReady=audience==='all'||(audience==='single'&&selectedUsers.length===1)||(audience==='group'&&selectedUsers.length>0);
 
   return <div className="settings-stack">
     <section className="admin-card settings-hero"><div><span>ADMIN CONFIGURATION</span><h2>Control the live Unmask launch network.</h2><p>Change rewards, voting, build stages and community notifications without touching code.</p></div><FA name="sliders"/></section>
 
-    <section className="admin-card settings-block"><CardHead icon="coins" title="Social Coin Rewards" sub="Control what following Unmask on social platforms earns."/><div className="settings-rows">{rewards.filter((r:any)=>['follow_x','follow_tiktok'].includes(r.key)).map((r:any,i:number)=><div key={r.key}><div><b>{r.title||r.key}</b><small>{r.description}</small></div><input type="number" min="0" value={r.coin_amount} onChange={e=>setRewards(xs=>xs.map((x:any)=>x.key===r.key?{...x,coin_amount:e.target.value}:x))}/><label className="toggle"><input type="checkbox" checked={r.active} onChange={e=>setRewards(xs=>xs.map((x:any)=>x.key===r.key?{...x,active:e.target.checked}:x))}/><span/></label></div>)}</div><button className="settings-save" disabled={busy==='rewards'} onClick={saveRewards}>{busy==='rewards'?'Saving…':'Save reward settings'}</button></section>
+    <section className="admin-card settings-block"><CardHead icon="coins" title="Social Coin Rewards" sub="Control what following Unmask on social platforms earns."/><div className="settings-rows">{rewards.filter((r:any)=>['follow_x','follow_tiktok'].includes(r.key)).map((r:any)=><div key={r.key}><div><b>{r.title||r.key}</b><small>{r.description}</small></div><input type="number" min="0" value={r.coin_amount} onChange={e=>setRewards(xs=>xs.map((x:any)=>x.key===r.key?{...x,coin_amount:e.target.value}:x))}/><label className="toggle"><input type="checkbox" checked={r.active} onChange={e=>setRewards(xs=>xs.map((x:any)=>x.key===r.key?{...x,active:e.target.checked}:x))}/><span/></label></div>)}</div><button className="settings-save" disabled={busy==='rewards'} onClick={saveRewards}>{busy==='rewards'?'Saving…':'Save reward settings'}</button></section>
 
     <section className="admin-card settings-block"><CardHead icon="hammer" title="Build Round & Category Voting" sub="Move the community through Vote → Selected → Building → Testing → Live."/><div className="settings-form-grid"><label>Current phase<select value={phase} onChange={e=>setPhase(e.target.value)}><option value="voting">Voting</option><option value="selecting">Selected</option><option value="building">Building</option><option value="testing">Testing</option><option value="live">Live</option></select></label><label>Voting ends<input type="datetime-local" value={ends} onChange={e=>setEnds(e.target.value)}/></label><label>Selected category<select value={selectedCategory} onChange={e=>setSelectedCategory(e.target.value)}><option value="">No category selected</option>{categories.map((c:any)=><option value={c.id} key={c.id}>{c.name} · {c.votes||0} votes</option>)}</select></label></div><button className="settings-save" disabled={busy==='build'} onClick={saveBuild}>{busy==='build'?'Saving…':'Update build round'}</button></section>
 
-    <section className="admin-card settings-block"><CardHead icon="bell" title="Send Community Notification" sub="Send a custom in-app and push update to every Unmasker who enabled notifications."/><div className="broadcast-form"><input placeholder="Notification title" value={broadcast.title} onChange={e=>setBroadcast({...broadcast,title:e.target.value})}/><textarea placeholder="What should Unmaskers know?" value={broadcast.body} onChange={e=>setBroadcast({...broadcast,body:e.target.value})}/><input placeholder="Open this link when tapped" value={broadcast.link} onChange={e=>setBroadcast({...broadcast,link:e.target.value})}/></div><button className="settings-save" disabled={busy==='broadcast'||broadcast.title.trim().length<2||broadcast.body.trim().length<2} onClick={sendBroadcast}>{busy==='broadcast'?'Sending…':'Send notification to Unmaskers'}</button></section>
+    <section className="admin-card settings-block notification-builder">
+      <CardHead icon="bell" title="Send Notification" sub="Send to everyone, one specific Unmasker, or a hand-picked group."/>
+
+      <div className="audience-tabs">
+        <button className={audience==='all'?'active':''} onClick={()=>changeAudience('all')}><FA name="users"/> Everyone</button>
+        <button className={audience==='single'?'active':''} onClick={()=>changeAudience('single')}><FA name="user"/> One user</button>
+        <button className={audience==='group'?'active':''} onClick={()=>changeAudience('group')}><FA name="user-group"/> Selected group</button>
+      </div>
+
+      {audience!=='all'&&<div className="recipient-picker">
+        <div className="recipient-search"><FA name="magnifying-glass"/><input value={userSearch} onChange={e=>setUserSearch(e.target.value)} placeholder="Search by name, email or location…"/></div>
+        <div className="recipient-list">
+          {visibleUsers.length===0&&<div className="recipient-empty">No matching users.</div>}
+          {visibleUsers.map((u:any)=>{
+            const checked=selectedUsers.includes(u.id);
+            return <button type="button" key={u.id} className={checked?'selected':''} onClick={()=>toggleUser(u.id)}>
+              <span className="recipient-avatar">{(u.display_name||u.email||'U').trim().charAt(0).toUpperCase()}</span>
+              <div><b>{u.display_name||'Unmasker'}</b><small>{u.email||[u.region,u.country].filter(Boolean).join(', ')||'No email shown'}</small></div>
+              <span className="recipient-check">{checked?<FA name="check"/>:<FA name={audience==='single'?'circle':'square'}/>}</span>
+            </button>
+          })}
+        </div>
+        <div className="recipient-summary">
+          <b>{selectedUsers.length}</b> {selectedUsers.length===1?'recipient':'recipients'} selected
+          {audience==='single'&&<span>Choose exactly one person.</span>}
+          {audience==='group'&&<span>Select as many people as you want.</span>}
+        </div>
+      </div>}
+
+      <div className="broadcast-form">
+        <input placeholder="Notification title" value={broadcast.title} onChange={e=>setBroadcast({...broadcast,title:e.target.value})}/>
+        <textarea placeholder="What should they know?" value={broadcast.body} onChange={e=>setBroadcast({...broadcast,body:e.target.value})}/>
+        <input placeholder="Open this link when tapped" value={broadcast.link} onChange={e=>setBroadcast({...broadcast,link:e.target.value})}/>
+      </div>
+
+      <button className="settings-save" disabled={busy==='broadcast'||broadcast.title.trim().length<2||broadcast.body.trim().length<2||!recipientReady} onClick={sendBroadcast}>
+        {busy==='broadcast'?'Sending…':audience==='all'?'Send to everyone':audience==='single'?'Send to selected user':'Send to selected group'}
+      </button>
+    </section>
   </div>;
 }
 
