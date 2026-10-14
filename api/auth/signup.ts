@@ -1,4 +1,5 @@
-import { admin, ensureAllowedEmail, hashCode, json, makeCode, normalizeEmail, sendVerificationEmail } from '../_lib/server';
+import crypto from 'node:crypto';
+import { admin, ensureAllowedEmail, hashCode, json, logError, makeCode, normalizeEmail, sendVerificationEmail } from '../_lib/server';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return json(res, 405, { error: 'Method not allowed.' });
@@ -52,7 +53,20 @@ export default async function handler(req: any, res: any) {
     await sendVerificationEmail(email, code);
     return json(res, 200, { success: true });
   } catch (error: any) {
-    console.error('[signup]', error?.message || error);
-    return json(res, 500, { error: error?.message || 'Could not create your account.' });
+    const message = error?.message || 'Could not create your account.';
+    const errorId = crypto.randomUUID();
+    await logError({
+      source: 'vercel-api',
+      route: '/api/auth/signup',
+      code: errorId,
+      message,
+      details: {
+        hasEmail: Boolean(req.body?.email),
+        hasFullName: Boolean(req.body?.fullName),
+        hasCountry: Boolean(req.body?.country),
+        hasRegion: Boolean(req.body?.region)
+      }
+    });
+    return json(res, 500, { error: message, errorId });
   }
 }
