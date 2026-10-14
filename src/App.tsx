@@ -5,6 +5,7 @@ import {
   chooseCategory,
   claimTask,
   getPulse,
+  getLaunchTrends,
   getSummary,
   listCategories,
   rewardRules,
@@ -224,73 +225,232 @@ function Auth({ go, loginFirst = false }: any) {
   </main>;
 }
 
+
+const CATEGORY_IMAGES: Record<string,string> = {
+  'Beauty':'https://images.unsplash.com/photo-1596462502278-27bfdc403348?auto=format&fit=crop&w=1100&q=82',
+  'Home Appliances':'https://images.unsplash.com/photo-1556911220-bff31c812dba?auto=format&fit=crop&w=1100&q=82',
+  'Tech':'https://images.unsplash.com/photo-1537822427422-52c6d57db73c?auto=format&fit=crop&w=1100&q=82',
+  'Fashion':'https://images.unsplash.com/photo-1445205170230-053b83016050?auto=format&fit=crop&w=1100&q=82',
+  'Food & Drink':'https://images.unsplash.com/photo-1685640206182-c51b8aa9b686?auto=format&fit=crop&w=1100&q=82',
+  'Gaming':'https://images.unsplash.com/photo-1622297845775-5ff3fef71d13?auto=format&fit=crop&w=1100&q=82',
+  'Automotive':'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=1100&q=82'
+};
+
+const TASK_IMAGES: Record<string,string> = {
+  follow_x:'/resources/task-x.webp',
+  follow_tiktok:'https://images.unsplash.com/photo-1645848810565-ff3c1de0da09?auto=format&fit=crop&w=1200&q=82',
+  unmask:'https://img.piri.net/mnresize/720/-/piri/upload/3/2024/2/3/2893c951-e-ticaret-icin-instagram-reels.jpg',
+  suggest:'https://images.unsplash.com/photo-1456324504439-367cee3b3c32?auto=format&fit=crop&w=1200&q=82'
+};
+
+function categoryImage(name:string){
+  return CATEGORY_IMAGES[name] || CATEGORY_IMAGES.Tech;
+}
+
+function domainForProduct(product:any){
+  const raw=[product?.category,product?.brand,product?.product_name].filter(Boolean).join(' ').toLowerCase();
+  if(/beauty|cosmetic|skin|makeup|hair|fragrance|perfume/.test(raw)) return 'Beauty';
+  if(/appliance|kitchen|blender|fridge|refrigerator|microwave|air fryer|washing|vacuum|home/.test(raw)) return 'Home Appliances';
+  if(/fashion|cloth|dress|shoe|sneaker|bag|jewelry|jewellery|accessor|apparel/.test(raw)) return 'Fashion';
+  if(/food|drink|grocery|snack|beverage|coffee|tea/.test(raw)) return 'Food & Drink';
+  if(/gaming|game|console|playstation|xbox|controller/.test(raw)) return 'Gaming';
+  if(/car|auto|vehicle|automotive|tyre|tire/.test(raw)) return 'Automotive';
+  if(/phone|gadget|tech|electronic|laptop|computer|tablet|watch|headphone|earbud|camera/.test(raw)) return 'Tech';
+  return 'Tech';
+}
+
+function productsForCategory(products:any[] = [],categoryName:string){
+  return products.filter((p:any)=>domainForProduct(p)===categoryName);
+}
+
+function LiveTrendBoard({ data, go, full=false }:any){
+  const categories=data?.categories||[];
+  const [expanded,setExpanded]=useState<string|null>(categories?.[0]?.id||null);
+
+  useEffect(()=>{
+    if(!expanded && categories?.[0]?.id) setExpanded(categories[0].id);
+  },[categories,expanded]);
+
+  const totalVotes=Number(data?.total_votes||categories.reduce((n:number,c:any)=>n+Number(c.votes||0),0));
+  const visible=full?categories:categories.slice(0,7);
+
+  return <section className={'live-pulse '+(full?'full':'')}>
+    <div className="live-pulse-head">
+      <div>
+        <div className="live-label"><span className="live-dot"/><b>LIVE CATEGORY PULSE</b></div>
+        <h2>{full?'What everyone is pushing forward.':'The heat of the moment.'}</h2>
+        <p>Votes and product requests update here as Unmaskers make their choices.</p>
+      </div>
+      <div className="live-total"><strong>{totalVotes}</strong><span>total category {totalVotes===1?'vote':'votes'}</span></div>
+    </div>
+
+    <div className="category-heat-list">
+      {visible.map((cat:any,index:number)=>{
+        const open=expanded===cat.id;
+        const products=productsForCategory(data?.products||[],cat.name);
+        const pct=totalVotes?Math.round((Number(cat.votes||0)/totalVotes)*100):0;
+        const productRows=full?products:products.slice(0,3);
+        return <article className={'heat-category '+(open?'open':'')} key={cat.id}>
+          <button className="heat-category-main" onClick={()=>setExpanded(open?null:cat.id)}>
+            <div className="heat-image-wrap">
+              <img src={categoryImage(cat.name)} alt={cat.name}/>
+              <span className="heat-rank">{index+1}</span>
+            </div>
+            <div className="heat-meta">
+              <div className="heat-name-row"><h3>{cat.name}</h3>{index===0&&<span className="hot-chip">Leading</span>}</div>
+              <div className="heat-vote-line"><strong>{cat.votes||0}</strong> total {Number(cat.votes||0)===1?'vote':'votes'}</div>
+              <div className="heat-bar"><span style={{width:(totalVotes?pct:0)+'%'}}/></div>
+            </div>
+            <div className="pulse-visual" aria-hidden="true"><i/><i/><i/><i/><i/></div>
+            <FA name={open?'chevron-up':'chevron-down'}/>
+          </button>
+
+          {open&&<div className="heat-products">
+            <div className="heat-products-head">
+              <div><b>{full?'Product requests in ':'Top product requests in '}{cat.name}</b><span>{products.reduce((n:number,p:any)=>n+Number(p.suggestions||0),0)} total requests</span></div>
+              {!full&&<button onClick={()=>go('trends')}>View all <FA name="arrow-right"/></button>}
+            </div>
+            {!productRows.length?<div className="heat-empty"><FA name="sparkles"/><span>No product requests in this category yet. The first suggestion will show here live.</span></div>:
+              <div className="heat-product-grid">{productRows.map((p:any,i:number)=><article className="heat-product" key={p.key||p.product_name}>
+                <span className="product-rank">{i+1}</span>
+                <div className="product-thumb"><FA name="box-open"/></div>
+                <div><b>{p.product_name}</b><small>{p.brand||cat.name}</small></div>
+                <strong>{p.suggestions||0}</strong>
+              </article>)}</div>}
+          </div>}
+        </article>
+      })}
+    </div>
+
+    {!full&&<button className="live-board-link" onClick={()=>go('trends')}>See the full live board <FA name="arrow-right"/></button>}
+  </section>;
+}
+
+function CategoryVoteModal({ categories, trends, currentVote, onClose, onVote, busy }:any){
+  const current=categories.find((c:any)=>c.name===currentVote);
+  const [selected,setSelected]=useState(current?.id||categories?.[0]?.id||'');
+  const selectedCategory=categories.find((c:any)=>c.id===selected);
+  const votesFor=(name:string)=>trends?.categories?.find((x:any)=>x.name===name)?.votes||0;
+
+  return <div className="modal-backdrop" onMouseDown={onClose}>
+    <section className="category-modal" onMouseDown={e=>e.stopPropagation()}>
+      <div className="modal-grip"/>
+      <div className="modal-title-row"><div><span className="eyebrow">YOUR VOTE SHAPES THE BUILD</span><h2>What should Unmask build first?</h2><p>Pick the category you most want us to unlock. You can change your vote while voting is open.</p></div><button className="modal-close" onClick={onClose}><FA name="xmark"/></button></div>
+      <div className="category-modal-grid">
+        {categories.map((cat:any)=><button key={cat.id} className={'category-modal-card '+(selected===cat.id?'selected':'')} onClick={()=>setSelected(cat.id)}>
+          <img src={categoryImage(cat.name)} alt={cat.name}/>
+          <div className="category-card-overlay"><b>{cat.name}</b><span>{votesFor(cat.name)} {votesFor(cat.name)===1?'vote':'votes'}</span></div>
+          {selected===cat.id&&<span className="category-selected"><FA name="check"/></span>}
+        </button>)}
+      </div>
+      <button className="btn solid full category-confirm" disabled={!selected||busy} onClick={()=>onVote(selected)}>{busy?'Saving your vote…':'Vote for '+(selectedCategory?.name||'this category')} <FA name="arrow-right"/></button>
+    </section>
+  </div>;
+}
+
 function Dashboard({ go }: any) {
-  const [summary, setSummary] = useState<any>(null);
-  const [pulse, setPulse] = useState<any>({ categories:[],products:[] });
-  const [categories, setCategories] = useState<any[]>([]);
-  const [notice, setNotice] = useState<any>(null);
-  const [clickedTask, setClickedTask] = useState<string | null>(null);
+  const [summary,setSummary]=useState<any>(null);
+  const [trends,setTrends]=useState<any>({categories:[],products:[],total_votes:0,total_suggestions:0});
+  const [categories,setCategories]=useState<any[]>([]);
+  const [notice,setNotice]=useState<any>(null);
+  const [clickedTask,setClickedTask]=useState<string|null>(null);
+  const [showCategoryPicker,setShowCategoryPicker]=useState(false);
+  const [voteBusy,setVoteBusy]=useState(false);
 
-  const refresh = async () => {
-    const [s,p,c] = await Promise.all([getSummary(),getPulse(),listCategories()]);
-    setSummary(s); setPulse(p); setCategories(c);
-  };
-  useEffect(() => { refresh().catch(()=>undefined); }, []);
-
-  const pickCategory = async (id:string) => {
-    try { await chooseCategory(id); setNotice({tone:'success',text:'Your choice is in. You’ve added your voice to what Unmask builds first.'}); await refresh(); }
-    catch(err:any){ setNotice({tone:'error',text:err.message}); }
+  const refresh=async()=>{
+    const [s,t,c]=await Promise.all([getSummary(),getLaunchTrends(),listCategories()]);
+    setSummary(s);setTrends(t);setCategories(c);
   };
 
-  const social = async (task:any) => {
-    if (!clickedTask || clickedTask !== task.key) {
-      window.open(task.url, '_blank', 'noopener,noreferrer');
+  useEffect(()=>{
+    refresh().catch(()=>undefined);
+    const channel=supabase.channel('launch-home-live')
+      .on('postgres_changes',{event:'*',schema:'public',table:'launch_category_votes'},()=>refresh())
+      .on('postgres_changes',{event:'*',schema:'public',table:'product_suggestions'},()=>refresh())
+      .subscribe();
+    return()=>{supabase.removeChannel(channel)};
+  },[]);
+
+  const pickCategory=async(id:string)=>{
+    setVoteBusy(true);
+    try{
+      await chooseCategory(id);
+      await refresh();
+      setShowCategoryPicker(false);
+      setNotice({tone:'success',text:'Your vote is live. You just helped shape what Unmask builds first.'});
+    }catch(err:any){setNotice({tone:'error',text:err.message})}
+    finally{setVoteBusy(false)}
+  };
+
+  const social=async(task:any)=>{
+    if(!clickedTask||clickedTask!==task.key){
+      window.open(task.url,'_blank','noopener,noreferrer');
       setClickedTask(task.key);
       return;
     }
-    try { await claimTask(task.key); setNotice({tone:'success',text:'Nice. Your task is marked complete and your Coins have been added.'}); setClickedTask(null); await refresh(); }
-    catch(err:any){ setNotice({tone:'error',text:err.message}); }
+    try{
+      await claimTask(task.key);
+      setNotice({tone:'success',text:'Task marked complete. Your Coins have been added.'});
+      setClickedTask(null);
+      await refresh();
+    }catch(err:any){setNotice({tone:'error',text:err.message})}
   };
 
-  const invite = async () => {
-    if (!summary?.referralCode) return;
-    const link = window.location.origin + '?ref=' + summary.referralCode;
-    try { await navigator.clipboard.writeText(link); setNotice({tone:'success',text:'Your invite link is copied.'}); }
-    catch { window.prompt('Copy your invite link', link); }
+  const invite=async()=>{
+    if(!summary?.referralCode)return;
+    const link=window.location.origin+'?ref='+summary.referralCode;
+    try{await navigator.clipboard.writeText(link);setNotice({tone:'success',text:'Your invite link is copied.'})}
+    catch{window.prompt('Copy your invite link',link)}
   };
+
+  const socialTasks=summary?.tasks?.filter((t:any)=>t.key==='follow_x'||t.key==='follow_tiktok')||[];
 
   return <Shell go={go} active="dashboard" summary={summary}>
     <section className="dash-hero">
-      <div><span className="eyebrow">WELCOME BACK{summary?.displayName ? ', '+summary.displayName.toUpperCase() : ''}</span><h1>You’re helping decide <em>what gets unmasked first.</em></h1><p>See what’s leading, complete a few useful moves, and leave better information behind for the next buyer.</p></div>
-      <div className="dash-coin"><span>Your Coins</span><strong>{summary?.coins || 0}</strong><small>earned from real contribution</small></div>
+      <div><span className="eyebrow">WELCOME BACK{summary?.displayName?', '+summary.displayName.toUpperCase():''}</span><h1>You’re helping decide <em>what gets unmasked first.</em></h1><p>Watch the live race, cast your vote and help surface the products people most want answers about.</p></div>
+      <div className="dash-coin"><span>Your Coins</span><strong>{summary?.coins||0}</strong><small>earned from real contribution</small></div>
     </section>
 
-    <section className="top-grid">
-      <RankCard title="Top categories" rows={pulse.categories?.slice(0,3)} label="name" count="votes" />
-      <RankCard title="Top products" rows={pulse.products?.slice(0,3)} label="product_name" count="suggestions" />
-    </section>
+    <LiveTrendBoard data={trends} go={go}/>
 
-    <section className="task-section">
-      <div className="section-head compact"><div><span className="eyebrow">YOUR BUILD LIST</span><h2>Small moves that help Unmask grow.</h2></div><span className="progress-pill">{summary?.tasks?.filter((t:any)=>t.completed).length || 0}/{summary?.tasks?.length || 3} done</span></div>
-      <div className="task-list">
-        {summary?.tasks?.map((task:any) => task.key === 'choose_category' ? <article className={'task-card '+(task.completed?'done':'')} key={task.key}>
-          <div className="task-icon"><FA name="layer-group" /></div>
-          <div><b>Help choose where Unmask starts.</b><span>Your vote helps decide which category we build first.</span>{summary?.voteName && <small>Your choice: {summary.voteName}</small>}</div>
-          {task.completed ? <span className="done-mark"><FA name="check" /></span> : <div className="category-picks">{categories.slice(0,6).map(c=><button key={c.id} onClick={()=>pickCategory(c.id)}>{c.name}</button>)}</div>}
-        </article> : <article className={'task-card '+(task.completed?'done':'')} key={task.key}>
-          <div className="task-icon"><i className={'fa-brands fa-'+(task.key==='follow_x'?'x-twitter':'tiktok')} /></div>
-          <div><b>{task.title}</b><span>{task.description}</span>{task.coin_amount > 0 && <small>+{task.coin_amount} Coins</small>}</div>
-          {task.completed ? <span className="done-mark"><FA name="check" /></span> : <button className="btn tiny" onClick={()=>social(task)}>{clickedTask===task.key?'I followed':'Follow'} </button>}
-        </article>)}
+    <section className="decision-zone">
+      <div className="decision-bg">
+        <img src={categoryImage('Beauty')} alt=""/>
+        <img src={categoryImage('Tech')} alt=""/>
+        <img src={categoryImage('Home Appliances')} alt=""/>
       </div>
+      <div className="decision-content">
+        <div className="decision-kicker"><span className="live-dot"/><b>HELP CHOOSE WHERE UNMASK STARTS</b></div>
+        <h2>Your vote helps decide the first category we build.</h2>
+        <p>Beauty, Tech, Fashion, Gaming, Home Appliances and more are all open. Pick the one you want Unmask to unlock first.</p>
+        {summary?.voteName&&<div className="current-vote"><FA name="circle-check"/><span>Your current vote: <b>{summary.voteName}</b></span></div>}
+        <button className="btn solid" onClick={()=>setShowCategoryPicker(true)}>{summary?.voteName?'Change my vote':'Choose a category'} <FA name="arrow-right"/></button>
+      </div>
+      <span className="decision-count">{categories.length} categories open</span>
     </section>
 
-    <section className="quick-actions">
-      <button onClick={()=>go('unmask')}><span><FA name="camera" /></span><div><b>Unmask something you use</b><small>Start with a photo.</small></div><FA name="chevron-right" /></button>
-      <button onClick={()=>go('suggest')}><span><FA name="lightbulb" /></span><div><b>Suggest something to cover</b><small>Show us what buyers are curious about.</small></div><FA name="chevron-right" /></button>
-      <button onClick={invite}><span><FA name="user-plus" /></span><div><b>Invite another Unmasker</b><small>Qualified referrals can earn Coins.</small></div><FA name="chevron-right" /></button>
+    <section className="action-zone">
+      <div className="section-head compact"><div><span className="eyebrow">KEEP THE MOVEMENT GOING</span><h2>Quick ways to take part.</h2></div><span className="progress-pill">{summary?.tasks?.filter((t:any)=>t.completed).length||0}/{summary?.tasks?.length||3} done</span></div>
+      <div className="banner-grid">
+        {socialTasks.map((task:any)=><button key={task.key} className={'action-banner social-banner '+(task.completed?'completed':'')} style={{backgroundImage:'linear-gradient(90deg,rgba(25,4,10,.84),rgba(50,5,16,.42)),url("'+TASK_IMAGES[task.key]+'")'}} onClick={()=>task.completed?undefined:social(task)}>
+          <div className="banner-copy"><span className="banner-kicker"><i className={'fa-brands fa-'+(task.key==='follow_x'?'x-twitter':'tiktok')}/>{task.completed?'Completed':'Social'}</span><b>{task.key==='follow_x'?'Follow Unmask on X':'Follow us on TikTok'}</b><small>{task.key==='follow_x'?'Stay close to the latest updates.':'See unmasking content as it drops.'}</small></div>
+          <span className="coin-reward">{task.completed?<><FA name="check"/> Done</>:<><FA name="coins"/> +{task.coin_amount||100}</>}</span>
+          {!task.completed&&<span className="banner-action">{clickedTask===task.key?'I followed':'Open'} <FA name="arrow-right"/></span>}
+        </button>)}
+
+        <button className="action-banner" style={{backgroundImage:'linear-gradient(90deg,rgba(34,8,16,.88),rgba(55,10,20,.32)),url("'+TASK_IMAGES.unmask+'")'}} onClick={()=>go('unmask')}>
+          <div className="banner-copy"><span className="banner-kicker"><FA name="camera"/>Contribute</span><b>Unmask something you use</b><small>Share what the product was really like.</small></div><span className="banner-action">Start <FA name="arrow-right"/></span>
+        </button>
+
+        <button className="action-banner" style={{backgroundImage:'linear-gradient(90deg,rgba(34,8,16,.88),rgba(55,10,20,.28)),url("'+TASK_IMAGES.suggest+'")'}} onClick={()=>go('suggest')}>
+          <div className="banner-copy"><span className="banner-kicker"><FA name="magnifying-glass"/>Shape what’s next</span><b>Suggest something to uncover</b><small>Tell us what you want Unmask to look into.</small></div><span className="banner-action">Suggest <FA name="arrow-right"/></span>
+        </button>
+      </div>
+      <button className="invite-strip" onClick={invite}><span><FA name="user-plus"/></span><div><b>Bring another Unmasker into the build</b><small>Qualified referrals can earn Coins.</small></div><FA name="chevron-right"/></button>
     </section>
-    {notice && <Notice tone={notice.tone}>{notice.text}</Notice>}
+
+    {notice&&<Notice tone={notice.tone}>{notice.text}</Notice>}
+    {showCategoryPicker&&<CategoryVoteModal categories={categories} trends={trends} currentVote={summary?.voteName} onClose={()=>setShowCategoryPicker(false)} onVote={pickCategory} busy={voteBusy}/>}
   </Shell>;
 }
 
@@ -299,11 +459,30 @@ function RankCard({ title, rows=[], label, count }: any) {
 }
 
 function Trends({ go, session }: any) {
-  const [pulse,setPulse]=useState<any>({categories:[],products:[],experiences:[]});
+  const [trends,setTrends]=useState<any>({categories:[],products:[],total_votes:0,total_suggestions:0});
   const [summary,setSummary]=useState<any>(null);
-  useEffect(()=>{getPulse().then(setPulse).catch(()=>undefined); if(session)getSummary().then(setSummary).catch(()=>undefined)},[session]);
-  const content = <><PageIntro kicker="WHAT PEOPLE WANT NEXT" title="See what’s moving." body="Every vote, suggestion and shared experience here comes from real Unmask activity." /><section className="trend-grid"><RankCard title="All category votes" rows={pulse.categories} label="name" count="votes" /><RankCard title="Products people want covered" rows={pulse.products} label="product_name" count="suggestions" /></section><section className="experience-list"><h2>Products people have shared experience with</h2>{!pulse.experiences?.length?<Empty title="No experiences yet" body="The first saved product experiences will appear here." />:pulse.experiences.map((x:any)=><article key={x.key}><div><b>{x.product_name}</b><span>{x.brand || x.category || 'Product'}</span></div><strong>{x.experiences} {x.experiences===1?'experience':'experiences'}</strong></article>)}</section></>;
-  return session ? <Shell go={go} active="trends" summary={summary}>{content}</Shell> : <main className="landing"><header className="site-head"><Brand/><button className="btn solid" onClick={()=>go('auth')}>Join / Log in</button></header>{content}</main>;
+
+  const refresh=()=>{
+    getLaunchTrends().then(setTrends).catch(()=>undefined);
+    if(session)getSummary().then(setSummary).catch(()=>undefined);
+  };
+
+  useEffect(()=>{
+    refresh();
+    const channel=supabase.channel('launch-trends-live')
+      .on('postgres_changes',{event:'*',schema:'public',table:'launch_category_votes'},refresh)
+      .on('postgres_changes',{event:'*',schema:'public',table:'product_suggestions'},refresh)
+      .subscribe();
+    return()=>{supabase.removeChannel(channel)};
+  },[session]);
+
+  const content=<>
+    <PageIntro kicker="LIVE COMMUNITY TREND" title="What people want Unmask to build and uncover." body="This board is powered by real category votes and real product requests. Open any category to see everything people are asking for inside it."/>
+    <div className="trend-summary-strip"><div><span className="live-dot"/><b>Live board</b></div><span>{trends.total_votes||0} category votes</span><span>{trends.total_suggestions||0} product requests</span></div>
+    <LiveTrendBoard data={trends} go={go} full/>
+  </>;
+
+  return session?<Shell go={go} active="trends" summary={summary}>{content}</Shell>:<main className="landing"><header className="site-head"><Brand/><button className="btn solid" onClick={()=>go('auth')}>Join / Log in</button></header><div className="public-trends">{content}</div></main>;
 }
 
 function Suggest({ go }: any) {
