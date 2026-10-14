@@ -7,10 +7,14 @@ import {
   getPulse,
   getLaunchTrends,
   getSummary,
+  getCommunityFeed,
+  getCommunityStats,
+  getMyUnmaskerMission,
   listCategories,
   rewardRules,
   submitExperience,
   suggestProduct,
+  toggleUnmaskLike,
   verifyOwnership
 } from './data';
 import { supabase } from './supabase';
@@ -87,39 +91,61 @@ function App() {
 }
 
 function Landing({ go, session }: any) {
-  const [pulse, setPulse] = useState<any>({ unmaskers: 0, categories: [], products: [] });
-  useEffect(() => { getPulse().then(setPulse).catch(() => undefined); }, []);
+  const [feed,setFeed]=useState<any[]>([]);
+  const [stats,setStats]=useState<any>({unmasked_today:0,unmasked_total:0,unmaskers_total:0,category_votes:0});
 
-  return <main className="landing">
-    <header className="site-head">
+  useEffect(()=>{
+    Promise.all([getCommunityFeed(6),getCommunityStats()]).then(([f,s])=>{setFeed(f);setStats(s)}).catch(()=>undefined);
+  },[]);
+
+  return <main className="landing movement-landing">
+    <header className="site-head simple-head">
       <Brand />
-      <nav><button onClick={() => go('trends')}>What’s moving</button><button onClick={() => go('rewards')}>Rewards</button></nav>
-      <button className="btn solid" onClick={() => go(session ? 'dashboard' : 'auth')}>{session ? 'Dashboard' : 'Join Unmask'}</button>
+      <nav><button onClick={()=>go('trends')}>Live activity</button></nav>
+      <button className="btn solid" onClick={()=>go(session?'dashboard':'auth')}>{session?'Enter Unmask':'Join the Unmaskers'}</button>
     </header>
 
-    <section className="hero">
-      <div className="hero-copy">
-        <span className="eyebrow">KNOW BEFORE YOU BUY</span>
-        <h1>Find out what a product is really like <em>before your money leaves your hand.</em></h1>
-        <p>See what people actually experienced, what changed over time, and whether the product makes sense for someone like you.</p>
-        <div className="hero-actions">
-          <button className="btn solid" onClick={() => go(session ? 'dashboard' : 'auth')}>{session ? 'Open dashboard' : 'Become an Unmasker'} <FA name="arrow-right" /></button>
-          <button className="btn ghost" onClick={() => go('trends')}>See what people want unmasked</button>
+    <section className="movement-hero">
+      <div className="movement-copy">
+        <span className="movement-kicker">WE ARE UNMASKERS.</span>
+        <h1>We reveal what products are <em>really</em> like.</h1>
+        <p>Used something? Tell people what actually happened. What lasted. What broke. What wasted your money. What was worth it.</p>
+        <div className="movement-actions">
+          <button className="btn solid movement-primary" onClick={()=>go(session?'unmask':'auth')}>Unmask a product <FA name="arrow-right"/></button>
+          <button className="btn ghost" onClick={()=>go('trends')}>See what Unmaskers are doing</button>
+        </div>
+        <div className="movement-stats">
+          <div><strong>{stats.unmasked_today||0}</strong><span>unmasked today</span></div>
+          <div><strong>{stats.unmasked_total||0}</strong><span>products shared</span></div>
+          <div><strong>{stats.unmaskers_total||0}</strong><span>Unmaskers</span></div>
         </div>
       </div>
-      <div className="hero-visual">
-        <div className="reveal-card"><span>Before</span><b>Looks promising.</b><small>Ads · claims · packaging</small></div>
-        <div className="reveal-line"><FA name="arrow-down" /></div>
-        <div className="reveal-card after"><span>After Unmask</span><b>Now you know what to expect.</b><small>Real use · context · time</small></div>
+
+      <div className="movement-manifesto">
+        <div className="manifesto-stamp">UNMASK IT.</div>
+        <h2>If a product deserves praise, say it. If it wasted your money, drag it into the light.</h2>
+        <p>Your experience can save the next person from making the same mistake.</p>
       </div>
     </section>
 
-    <section className="pulse-section">
-      <div className="section-head"><div><span className="eyebrow">THE MOVEMENT IS STARTING</span><h2>People are already shaping what comes first.</h2></div><button className="text-btn" onClick={() => go('trends')}>See everything <FA name="arrow-right" /></button></div>
-      <div className="pulse-cards">
-        <RankCard title="Categories people want first" rows={pulse.categories?.slice(0,3)} label="name" count="votes" />
-        <RankCard title="Products people want covered" rows={pulse.products?.slice(0,3)} label="product_name" count="suggestions" />
+    <section className="how-unmask-works">
+      <span className="eyebrow">IT IS THIS SIMPLE</span>
+      <h2>Know a product. Tell the truth. Help the next buyer.</h2>
+      <div className="simple-steps">
+        <article><span>1</span><b>Pick something you’ve used</b><small>Something in your house, bag, bathroom, kitchen or pocket.</small></article>
+        <article><span>2</span><b>Unmask what happened</b><small>How long it lasted, what worked, what failed, what surprised you.</small></article>
+        <article><span>3</span><b>Leave the truth behind</b><small>Another person sees the experience before spending their money.</small></article>
       </div>
+    </section>
+
+    <section className="landing-feed">
+      <div className="section-head"><div><span className="eyebrow">UNMASKERS ARE ACTIVE</span><h2>See what people are unmasking.</h2></div><button className="text-btn" onClick={()=>go('trends')}>See live activity <FA name="arrow-right"/></button></div>
+      <CommunityFeed items={feed} compact publicView/>
+    </section>
+
+    <section className="landing-join">
+      <div><span className="eyebrow">YOUR TURN</span><h2>Look around you. Pick one product. Unmask it.</h2><p>That is how the community grows — one honest experience at a time.</p></div>
+      <button className="btn solid" onClick={()=>go(session?'unmask':'auth')}>{session?'Unmask now':'Join and unmask'} <FA name="arrow-right"/></button>
     </section>
   </main>;
 }
@@ -127,15 +153,13 @@ function Landing({ go, session }: any) {
 function Shell({ children, go, active, summary }: any) {
   const nav = [
     ['dashboard','Home','house'],
-    ['trends','Trends','chart-simple'],
-    ['suggest','Suggest','lightbulb'],
     ['unmask','Unmask','camera'],
-    ['rewards','Rewards','gift']
+    ['trends','Live','bolt']
   ];
   return <main className="app-shell">
-    <header className="app-head"><Brand /><div className="head-right"><span className="coin-pill"><FA name="coins" /> {summary?.coins || 0}</span><span className="avatar">{summary?.displayName?.[0]?.toUpperCase() || 'U'}</span></div></header>
+    <header className="app-head"><Brand /><div className="head-right"><span className="avatar">{summary?.displayName?.[0]?.toUpperCase() || 'U'}</span></div></header>
     <div className="app-body">{children}</div>
-    <nav className="bottom-nav">{nav.map(([v,label,icon]) => <button key={v} className={active === v ? 'active' : ''} onClick={() => go(v)}><FA name={icon} /><span>{label}</span></button>)}</nav>
+    <nav className="bottom-nav simple-nav">{nav.map(([v,label,icon]) => <button key={v} className={active === v ? 'active' : ''} onClick={() => go(v)}><FA name={icon} /><span>{label}</span></button>)}</nav>
   </main>;
 }
 
@@ -193,7 +217,7 @@ function Auth({ go, loginFirst = false }: any) {
   return <main className="auth-page">
     <div className="auth-wrap">
       <Brand />
-      <div className="auth-copy"><span className="eyebrow">{mode === 'signup' ? 'JOIN THE BUILD' : 'WELCOME BACK'}</span><h1>{mode === 'signup' ? 'Create your Unmask account.' : 'Pick up where you left off.'}</h1><p>{mode === 'signup' ? 'You’ll help decide what we investigate first, share what products are really like, and earn Coins for useful contribution.' : 'Your votes, Coins and product history are waiting for you.'}</p></div>
+      <div className="auth-copy"><span className="eyebrow">{mode === 'signup' ? 'BECOME AN UNMASKER' : 'WELCOME BACK'}</span><h1>{mode === 'signup' ? 'Join the people revealing what products are really like.' : 'Keep unmasking.'}</h1><p>{mode === 'signup' ? 'Share what you have learned from products you have actually used. Help the next person buy smarter.' : 'Your Unmasker mission and community are waiting for you.'}</p></div>
       <div className="auth-tabs"><button className={mode==='signup'?'active':''} onClick={() => {setMode('signup');setStep('form');setNotice(null)}}>Create account</button><button className={mode==='login'?'active':''} onClick={() => {setMode('login');setStep('form');setNotice(null)}}>Log in</button></div>
 
       {mode === 'signup' && step === 'form' && <form className="form-stack" onSubmit={signup}>
