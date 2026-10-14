@@ -1,4 +1,4 @@
-import { admin, json } from './_lib/server';
+import { admin, json } from '../lib/server';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'GET') return json(res, 405, { error: 'Method not allowed.' });
