@@ -14,9 +14,8 @@ jobs:
       - name: Check production runtime
         run: |
           set -x
-          curl -sS -i --max-time 20 https://unmask-launch-network.vercel.app/api/ping
-          curl -sS -i --max-time 20 https://unmask-launch-network.vercel.app/api/env-check
           curl -sS -i --max-time 20 https://unmask-launch-network.vercel.app/api/health
-          curl -sS -i --max-time 20 -X POST https://unmask-launch-network.vercel.app/api/auth/signup \
+          curl -sS -i --max-time 20 "https://unmask-launch-network.vercel.app/api/product/search?q="
+          curl -sS -i --max-time 20 -X POST https://unmask-launch-network.vercel.app/api/product/identify \
             -H 'content-type: application/json' \
             --data '{}'
