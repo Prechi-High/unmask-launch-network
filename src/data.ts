@@ -158,3 +158,43 @@ export async function getBuildVisionState() {
   if (error) throw error;
   return data || { round: null, categories: [], experiences_gathered: 0 };
 }
+
+export async function getNotifications(limit = 30) {
+  const { data, error } = await supabase.rpc('get_my_notifications', { p_limit: limit });
+  if (error) throw error;
+  return data || { unread: 0, items: [] };
+}
+
+export async function markNotificationRead(id: string) {
+  const { error } = await supabase.rpc('mark_notification_read', { p_notification_id: id });
+  if (error) throw error;
+}
+
+export async function markAllNotificationsRead() {
+  const { error } = await supabase.rpc('mark_all_notifications_read');
+  if (error) throw error;
+}
+
+export async function savePushSubscription(subscription: PushSubscription) {
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) throw new Error('Please log in first.');
+  const json = subscription.toJSON();
+  const { error } = await supabase.from('push_subscriptions').upsert({
+    user_id: auth.user.id,
+    endpoint: subscription.endpoint,
+    p256dh: json.keys?.p256dh || '',
+    auth: json.keys?.auth || '',
+    user_agent: navigator.userAgent,
+    enabled: true,
+    updated_at: new Date().toISOString()
+  }, { onConflict: 'user_id,endpoint' });
+  if (error) throw error;
+}
+
+export async function getPushSubscriptionStatus() {
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return false;
+  const { data, error } = await supabase.from('push_subscriptions').select('id').eq('user_id', auth.user.id).eq('enabled', true).limit(1);
+  if (error) throw error;
+  return Boolean(data?.length);
+}
