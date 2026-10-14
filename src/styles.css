@@ -389,3 +389,12 @@
   .notification-detail-view{min-height:320px}
   .notification-detail-view h3{font-size:18px}
 }
+
+/* Dashboard hero — remove the dark overlay treatment */
+.unmasker-hero{
+  background:#701A2E;
+  box-shadow:0 18px 42px #701a2e1f;
+}
+.unmasker-hero:after{
+  display:none;
+}
