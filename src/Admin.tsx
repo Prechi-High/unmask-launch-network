@@ -4,6 +4,7 @@ import {
   broadcastNotification,
   getAdminOverview,
   getAdminSection,
+  getAdminSectionStats,
   isAdmin,
   updateBuildRound,
   updateCategory,
@@ -44,6 +45,7 @@ export default function AdminConsole({go}:{go:(view:string)=>void}){
   const [allowed,setAllowed]=useState<boolean|null>(null);
   const [section,setSection]=useState('overview');
   const [overview,setOverview]=useState<any>({});
+  const [sectionStats,setSectionStats]=useState<any>({});
   const [rows,setRows]=useState<any>([]);
   const [selected,setSelected]=useState<any>(null);
   const [search,setSearch]=useState('');
@@ -51,7 +53,11 @@ export default function AdminConsole({go}:{go:(view:string)=>void}){
   const [notice,setNotice]=useState('');
   const [adminName,setAdminName]=useState('Admin');
 
-  const loadOverview=async()=>setOverview(await getAdminOverview());
+  const loadOverview=async()=>{
+    const [ov,st]=await Promise.all([getAdminOverview(),getAdminSectionStats()]);
+    setOverview(ov);
+    setSectionStats(st);
+  };
   const loadSection=async(next=section)=>{
     if(next==='overview'||next==='settings'||next==='trends') return;
     const data=await getAdminSection(next);
@@ -96,7 +102,7 @@ export default function AdminConsole({go}:{go:(view:string)=>void}){
       <header className="admin-topbar">
         <div className="admin-title"><h1>{NAV.find(x=>x[0]===section)?.[1]}</h1><p>{section==='overview'?'Monitor. Moderate. Empower a more informed world.':'Manage live Unmask community data and platform configuration.'}</p></div>
         <div className="admin-search"><FA name="magnifying-glass"/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search products, users, requests, or anything…"/></div>
-        <button className="admin-bell"><FA name="bell"/><i/></button>
+        <button className="admin-bell" title={(overview.requests_pending||0)+(overview.experiences_pending||0)+(overview.collaborations_pending||0)+' items need attention'}><FA name="bell"/>{((overview.requests_pending||0)+(overview.experiences_pending||0)+(overview.collaborations_pending||0))>0&&<i/>}</button>
         <div className="admin-user"><span>{adminName[0]?.toUpperCase()}</span><div><b>{adminName}</b><small>Administrator</small></div></div>
       </header>
 
@@ -105,13 +111,13 @@ export default function AdminConsole({go}:{go:(view:string)=>void}){
 
       <div className="admin-content">
         {section==='overview'&&<OverviewPage data={overview} onOpen={setSection}/>}
-        {section==='requests'&&<RequestsPage rows={filtered} selected={selected} setSelected={setSelected} onChanged={()=>refresh('requests')}/>}
-        {section==='experiences'&&<ExperiencesPage rows={filtered} selected={selected} setSelected={setSelected} onChanged={()=>refresh('experiences')}/>}
-        {section==='categories'&&<CategoriesPage rows={filtered} selected={selected} setSelected={setSelected} onChanged={()=>refresh('categories')}/>}
-        {section==='products'&&<ProductsPage rows={filtered} selected={selected} setSelected={setSelected}/>}
-        {section==='collaborations'&&<CollaborationsPage rows={filtered} selected={selected} setSelected={setSelected} onChanged={()=>refresh('collaborations')}/>}
-        {section==='rewards'&&<RewardsPage data={rows} selected={selected} setSelected={setSelected} onChanged={()=>refresh('rewards')}/>}
-        {section==='users'&&<UsersPage rows={filtered} selected={selected} setSelected={setSelected}/>}
+        {section==='requests'&&<RequestsPage rows={filtered} stats={sectionStats.requests||{}} selected={selected} setSelected={setSelected} onChanged={()=>refresh('requests')}/>}
+        {section==='experiences'&&<ExperiencesPage rows={filtered} stats={sectionStats.experiences||{}} selected={selected} setSelected={setSelected} onChanged={()=>refresh('experiences')}/>}
+        {section==='categories'&&<CategoriesPage rows={filtered} stats={sectionStats.categories||{}} selected={selected} setSelected={setSelected} onChanged={()=>refresh('categories')}/>}
+        {section==='products'&&<ProductsPage rows={filtered} stats={sectionStats.products||{}} selected={selected} setSelected={setSelected}/>}
+        {section==='collaborations'&&<CollaborationsPage rows={filtered} stats={sectionStats.collaborations||{}} selected={selected} setSelected={setSelected} onChanged={()=>refresh('collaborations')}/>}
+        {section==='rewards'&&<RewardsPage data={rows} stats={sectionStats.rewards||{}} selected={selected} setSelected={setSelected} onChanged={()=>refresh('rewards')}/>}
+        {section==='users'&&<UsersPage rows={filtered} stats={sectionStats.users||{}} selected={selected} setSelected={setSelected}/>}
         {section==='trends'&&<TrendsPage overview={overview}/>}
         {section==='settings'&&<SettingsPage overview={overview} onSaved={()=>refresh('overview')} setNotice={setNotice}/>}
       </div>
@@ -163,14 +169,14 @@ function TableLayout({children,detail}:{children:any,detail?:any}){
   return <div className="admin-table-layout"><section className="admin-card admin-table-card">{children}</section>{detail&&<aside className="admin-card admin-detail">{detail}</aside>}</div>
 }
 
-function RequestsPage({rows,selected,setSelected,onChanged}:any){
+function RequestsPage({rows,stats,selected,setSelected,onChanged}:any){
   const change=async(id:string,status:string)=>{await updateRequestStatus(id,status);onChanged()};
   return <>
     <div className="admin-stats four">
-      <Stat icon="file-lines" label="Total Requests" value={rows.length}/>
-      <Stat icon="clock" label="New / Pending" value={rows.filter((x:any)=>['new','pending'].includes(x.status)).length}/>
-      <Stat icon="flask" label="In Research" value={rows.filter((x:any)=>['researching','in_research'].includes(x.status)).length}/>
-      <Stat icon="users" label="Assigned / Scheduled" value={rows.filter((x:any)=>['assigned','scheduled'].includes(x.status)).length}/>
+      <Stat icon="file-lines" label="Total Requests" value={stats.total||0}/>
+      <Stat icon="clock" label="New / Pending" value={stats.new_pending||0}/>
+      <Stat icon="flask" label="In Research" value={stats.research||0}/>
+      <Stat icon="users" label="Assigned / Scheduled" value={stats.assigned_scheduled||0}/>
     </div>
     <TableLayout detail={selected&&<><DetailTitle icon="file-lines" title="Request Detail"/><h3>{selected.product_name}</h3><p>{selected.brand||'No brand'} · {selected.category_label||'Uncategorised'}</p><Info label="Requested by" value={selected.requester_name||'Unmasker'}/><Info label="Status" value={selected.status}/><Info label="Submitted" value={fmtDate(selected.created_at)}/><h4>What they want to know</h4><p>{selected.notes||'No extra note was provided.'}</p><div className="detail-actions"><button onClick={()=>change(selected.id,'researching')}>Start research</button><button onClick={()=>change(selected.id,'scheduled')}>Mark scheduled</button><button onClick={()=>change(selected.id,'completed')}>Complete</button></div></>}>
       <CardHead icon="file-lines" title="All Product Requests" sub="Review and manage product requests from the Unmask community."/>
@@ -181,10 +187,10 @@ function RequestsPage({rows,selected,setSelected,onChanged}:any){
   </>;
 }
 
-function ExperiencesPage({rows,selected,setSelected,onChanged}:any){
+function ExperiencesPage({rows,stats,selected,setSelected,onChanged}:any){
   const change=async(id:string,status:string)=>{await updateExperienceStatus(id,status);onChanged()};
   return <>
-    <div className="admin-stats four"><Stat icon="cloud-arrow-up" label="Total Experiences" value={rows.length}/><Stat icon="clock" label="Needs Review" value={rows.filter((x:any)=>['new','review','flagged'].includes(x.moderation_status)).length}/><Stat icon="circle-check" label="Published" value={rows.filter((x:any)=>x.moderation_status==='published').length}/><Stat icon="flag" label="Flagged" value={rows.filter((x:any)=>x.moderation_status==='flagged').length}/></div>
+    <div className="admin-stats four"><Stat icon="cloud-arrow-up" label="Total Experiences" value={stats.total||0}/><Stat icon="clock" label="Needs Review" value={stats.needs_review||0}/><Stat icon="circle-check" label="Published" value={stats.published||0}/><Stat icon="flag" label="Flagged" value={stats.flagged||0}/></div>
     <TableLayout detail={selected&&<><DetailTitle icon="file-lines" title="Experience Detail"/><h3>{selected.product_name}</h3><p>{selected.brand||''} {selected.category?'· '+selected.category:''}</p><Info label="Submitted by" value={selected.author_name}/><Info label="Ownership" value={selected.ownership_status}/><Info label="Duration" value={selected.used_duration}/><Info label="Status" value={selected.moderation_status}/><h4>User's experience</h4><p>{selected.body}</p><div className="detail-actions"><button onClick={()=>change(selected.id,'published')}>Approve & publish</button><button onClick={()=>change(selected.id,'review')}>Move to review</button><button onClick={()=>change(selected.id,'flagged')}>Flag</button><button onClick={()=>change(selected.id,'rejected')}>Reject</button></div></>}>
       <CardHead icon="file-lines" title="All Uploads & Experiences" sub="Review, moderate, and organise user-submitted product experiences."/>
       <AdminTable headers={['Product','User','Category','Experience Summary','Ownership','Status','Submitted']}>{rows.map((r:any)=><tr key={r.id} onClick={()=>setSelected(r)}><td><b>{r.product_name}</b><small>{r.brand}</small></td><td>{r.author_name}</td><td>{r.category||'—'}</td><td className="clamp">{r.body}</td><td>{r.ownership_status}</td><td><Pill>{r.moderation_status}</Pill></td><td>{fmtDate(r.created_at)}</td></tr>)}</AdminTable>
@@ -192,10 +198,10 @@ function ExperiencesPage({rows,selected,setSelected,onChanged}:any){
   </>;
 }
 
-function CategoriesPage({rows,selected,setSelected,onChanged}:any){
+function CategoriesPage({rows,stats,selected,setSelected,onChanged}:any){
   const save=async(row:any,patch:any)=>{await updateCategory(row.id,patch.status??row.status,patch.build_stage??row.build_stage,patch.is_user_selectable??row.is_user_selectable);onChanged()};
   return <>
-    <div className="admin-stats four"><Stat icon="folder" label="Total Categories" value={rows.length}/><Stat icon="wave-square" label="Open for Voting" value={rows.filter((x:any)=>x.build_stage==='voting').length}/><Stat icon="star" label="Building / Testing" value={rows.filter((x:any)=>['building','testing'].includes(x.build_stage)).length}/><Stat icon="circle-check" label="Live" value={rows.filter((x:any)=>x.build_stage==='live').length}/></div>
+    <div className="admin-stats four"><Stat icon="folder" label="Total Categories" value={stats.total||0}/><Stat icon="wave-square" label="Open for Voting" value={stats.voting||0}/><Stat icon="star" label="Building / Testing" value={stats.building_testing||0}/><Stat icon="circle-check" label="Live" value={stats.live||0}/></div>
     <TableLayout detail={selected&&<><DetailTitle icon="folder" title="Category Detail"/><h3>{selected.name}</h3><Info label="Votes" value={selected.votes}/><Info label="Status" value={selected.status}/><Info label="Build stage" value={selected.build_stage}/><Info label="Open for voting" value={selected.is_user_selectable?'Yes':'No'}/><h4>Manage category</h4><select value={selected.build_stage||'voting'} onChange={async e=>{await save(selected,{build_stage:e.target.value});setSelected({...selected,build_stage:e.target.value})}}><option value="voting">Voting</option><option value="selecting">Selected</option><option value="building">Building</option><option value="testing">Testing</option><option value="live">Live</option></select><button className="detail-main-btn" onClick={async()=>{await save(selected,{is_user_selectable:!selected.is_user_selectable});setSelected({...selected,is_user_selectable:!selected.is_user_selectable})}}>{selected.is_user_selectable?'Pause voting':'Open for voting'}</button></>}>
       <CardHead icon="folder" title="All Categories" sub="Manage category voting, build stages and community priority."/>
       <AdminTable headers={['Category','Community Votes','Status','Build Stage','Voting','Updated']}>{rows.map((r:any)=><tr key={r.id} onClick={()=>setSelected(r)}><td><b>{r.name}</b><small>{r.description}</small></td><td><strong>{r.votes||0}</strong></td><td><Pill>{r.status}</Pill></td><td><Pill>{r.build_stage}</Pill></td><td>{r.is_user_selectable?'Open':'Paused'}</td><td>{fmtDate(r.live_at||r.testing_started_at||r.build_started_at||r.selected_at)}</td></tr>)}</AdminTable>
@@ -203,9 +209,9 @@ function CategoriesPage({rows,selected,setSelected,onChanged}:any){
   </>;
 }
 
-function ProductsPage({rows,selected,setSelected}:any){
+function ProductsPage({rows,stats,selected,setSelected}:any){
   return <>
-    <div className="admin-stats four"><Stat icon="tag" label="Total Products" value={rows.length}/><Stat icon="users" label="Community Interest" value={rows.reduce((n:number,x:any)=>n+Number(x.requests||0),0)}/><Stat icon="cloud-arrow-up" label="Experiences" value={rows.reduce((n:number,x:any)=>n+Number(x.experiences||0),0)}/><Stat icon="flask" label="Deep Unmasking" value={rows.filter((x:any)=>x.experiences>0).length}/></div>
+    <div className="admin-stats four"><Stat icon="tag" label="Total Products" value={stats.total||0}/><Stat icon="users" label="Products Requested" value={stats.with_requests||0}/><Stat icon="cloud-arrow-up" label="Experiences" value={stats.experience_count||0}/><Stat icon="flask" label="Products With Experiences" value={stats.with_experiences||0}/></div>
     <TableLayout detail={selected&&<><DetailTitle icon="tag" title="Product Detail"/>{selected.hero_image_url&&<img className="detail-product-img" src={selected.hero_image_url} alt=""/>}<h3>{selected.name}</h3><p>{selected.brand||'Unknown brand'} · {selected.category||'Uncategorised'}</p><Info label="Community requests" value={selected.requests||0}/><Info label="Experiences" value={selected.experiences||0}/><Info label="Source" value={selected.source}/><h4>About this product</h4><p>{selected.description||'No product description is stored yet.'}</p></>}>
       <CardHead icon="tag" title="All Products" sub="Manage product records and monitor items being unmasked."/>
       <AdminTable headers={['Product','Category','Source','Requests','Experiences','Last Updated']}>{rows.map((r:any)=><tr key={r.id} onClick={()=>setSelected(r)}><td><div className="product-cell">{r.hero_image_url?<img src={r.hero_image_url}/>:<span><FA name="box"/></span>}<div><b>{r.name}</b><small>{r.brand}</small></div></div></td><td>{r.category||'—'}</td><td><Pill>{r.source||'community'}</Pill></td><td>{r.requests||0}</td><td>{r.experiences||0}</td><td>{fmtDate(r.updated_at)}</td></tr>)}</AdminTable>
@@ -213,10 +219,10 @@ function ProductsPage({rows,selected,setSelected}:any){
   </>;
 }
 
-function CollaborationsPage({rows,selected,setSelected,onChanged}:any){
+function CollaborationsPage({rows,stats,selected,setSelected,onChanged}:any){
   const change=async(id:string,status:string)=>{await updateCollaborationStatus(id,status);onChanged()};
   return <>
-    <div className="admin-stats four"><Stat icon="handshake" label="Total Collaborations" value={rows.length}/><Stat icon="bullhorn" label="Live / Approved" value={rows.filter((x:any)=>['live','approved'].includes(x.status)).length}/><Stat icon="clock" label="Pending Review" value={rows.filter((x:any)=>['pending','new','review'].includes(x.status)).length}/><Stat icon="tag" label="Completed" value={rows.filter((x:any)=>x.status==='completed').length}/></div>
+    <div className="admin-stats four"><Stat icon="handshake" label="Total Collaborations" value={stats.total||0}/><Stat icon="bullhorn" label="Live / Approved" value={stats.live_approved||0}/><Stat icon="clock" label="Pending Review" value={stats.pending||0}/><Stat icon="tag" label="Completed" value={stats.completed||0}/></div>
     <TableLayout detail={selected&&<><DetailTitle icon="folder" title="Collaboration Detail"/><h3>{selected.business_name}</h3><p>{selected.product_name||'No product'} · {selected.category||'Uncategorised'}</p><Info label="Contact" value={selected.contact_name}/><Info label="Email" value={selected.email}/><Info label="Status" value={selected.status}/><h4>Why they contacted Unmask</h4><p>{selected.goal||selected.notes||'No brief provided.'}</p><div className="detail-actions"><button onClick={()=>change(selected.id,'approved')}>Approve</button><button onClick={()=>change(selected.id,'live')}>Mark live</button><button onClick={()=>change(selected.id,'completed')}>Complete</button><button onClick={()=>change(selected.id,'rejected')}>Reject</button></div></>}>
       <CardHead icon="folder" title="All Collaborations" sub="Review and manage partnership requests and partner-product opportunities."/>
       <AdminTable headers={['Business','Product','Category','Type','Status','Submitted']}>{rows.map((r:any)=><tr key={r.id} onClick={()=>setSelected(r)}><td><b>{r.business_name}</b><small>{r.contact_name}</small></td><td>{r.product_name||'—'}</td><td>{r.category||'—'}</td><td>{r.business_type||'—'}</td><td><Pill>{r.status}</Pill></td><td>{fmtDate(r.created_at)}</td></tr>)}</AdminTable>
@@ -224,12 +230,12 @@ function CollaborationsPage({rows,selected,setSelected,onChanged}:any){
   </>;
 }
 
-function RewardsPage({data,selected,setSelected,onChanged}:any){
+function RewardsPage({data,stats,selected,setSelected,onChanged}:any){
   const rules=data?.rules||[],ledger=data?.ledger||[];
   const [editing,setEditing]=useState<any>(null);
   const save=async()=>{if(!editing)return;await updateRewardRule(editing.key,Number(editing.coin_amount||0),Boolean(editing.active));setEditing(null);onChanged()};
   return <>
-    <div className="admin-stats four"><Stat icon="coins" label="Total Coins Issued" value={ledger.filter((x:any)=>x.amount>0).reduce((n:number,x:any)=>n+Number(x.amount),0)}/><Stat icon="tag" label="Active Reward Rules" value={rules.filter((x:any)=>x.active).length}/><Stat icon="clock" label="Recent Coin Events" value={ledger.length}/><Stat icon="gift" label="Social Reward Rules" value={rules.filter((x:any)=>['follow_x','follow_tiktok'].includes(x.key)).length}/></div>
+    <div className="admin-stats four"><Stat icon="coins" label="Total Coins Issued" value={stats.coins_issued||0}/><Stat icon="tag" label="Active Reward Rules" value={stats.active_rules||0}/><Stat icon="clock" label="Coin Events" value={stats.coin_events||0}/><Stat icon="gift" label="Social Reward Rules" value={stats.social_rules||0}/></div>
     <div className="admin-grid rewards-admin-grid">
       <section className="admin-card"><CardHead icon="sliders" title="Reward Rules" sub="Set exactly how many Coins social tasks give."/><div className="reward-rule-list">{rules.map((r:any)=><button key={r.key} onClick={()=>setEditing({...r})}><div><b>{r.title||r.key}</b><small>{r.description}</small></div><strong>{r.coin_amount} Coins</strong><Pill>{r.active?'Active':'Paused'}</Pill></button>)}</div></section>
       <section className="admin-card"><CardHead icon="coins" title="Recent Coin Activity" sub="Latest Coin credits across Unmask."/><div className="mini-table">{ledger.slice(0,12).map((l:any)=><button key={l.id} onClick={()=>setSelected(l)}><div><b>{l.display_name||'Unmasker'}</b><small>{l.note||l.source_type}</small></div><strong className={l.amount>=0?'positive':'negative'}>{l.amount>=0?'+':''}{l.amount}</strong></button>)}</div></section>
@@ -238,9 +244,9 @@ function RewardsPage({data,selected,setSelected,onChanged}:any){
   </>;
 }
 
-function UsersPage({rows,selected,setSelected}:any){
+function UsersPage({rows,stats,selected,setSelected}:any){
   return <>
-    <div className="admin-stats four"><Stat icon="users" label="Total Users" value={rows.length}/><Stat icon="shield" label="Administrators" value={rows.filter((x:any)=>x.is_admin).length}/><Stat icon="camera" label="Users Who Unmasked" value={rows.filter((x:any)=>x.unmaskings>0).length}/><Stat icon="coins" label="Coins Held" value={rows.reduce((n:number,x:any)=>n+Number(x.coins||0),0)}/></div>
+    <div className="admin-stats four"><Stat icon="users" label="Total Users" value={stats.total||0}/><Stat icon="shield" label="Administrators" value={stats.admins||0}/><Stat icon="camera" label="Users Who Unmasked" value={stats.unmaskers_with_experience||0}/><Stat icon="coins" label="Coins Held" value={stats.coins_held||0}/></div>
     <TableLayout detail={selected&&<><DetailTitle icon="user" title="User Detail"/><h3>{selected.display_name}</h3><Info label="Country" value={selected.country}/><Info label="Region" value={selected.region}/><Info label="Unmaskings" value={selected.unmaskings}/><Info label="Coins" value={selected.coins}/><Info label="Joined" value={fmtDate(selected.created_at)}/></>}>
       <CardHead icon="users" title="All Users" sub="Monitor Unmaskers and their community participation."/><AdminTable headers={['User','Country','Unmaskings','Coins','Role','Joined']}>{rows.map((r:any)=><tr key={r.id} onClick={()=>setSelected(r)}><td><b>{r.display_name||'Unmasker'}</b></td><td>{[r.region,r.country].filter(Boolean).join(', ')||'—'}</td><td>{r.unmaskings||0}</td><td>{r.coins||0}</td><td><Pill>{r.is_admin?'Admin':'Unmasker'}</Pill></td><td>{fmtDate(r.created_at)}</td></tr>)}</AdminTable>
     </TableLayout>
