@@ -29,7 +29,10 @@ import AdminConsole from './Admin';
 const FA = ({ name, className = '' }: { name: string; className?: string }) =>
   <i className={'fa-solid fa-' + name + ' ' + className} aria-hidden="true" />;
 
-const Brand = () => <img className="brand" src="/resources/unmask-logo.png" alt="Unmask — Know before you buy." />;
+const Brand = ({ onClick }: { onClick?: () => void }) =>
+  onClick
+    ? <button className="brand-link" onClick={onClick} aria-label="Go to Unmask home"><img className="brand" src="/resources/unmask-logo.png" alt="Unmask — Know before you buy." /></button>
+    : <img className="brand" src="/resources/unmask-logo.png" alt="Unmask — Know before you buy." />;
 
 
 function toUint8Array(base64String:string){
@@ -141,12 +144,12 @@ function App() {
   };
 
   if (!ready) return <div className="boot"><Brand /><span>Opening Unmask…</span></div>;
-  if (view === 'auth') return <Auth go={go} />;
-  if (view === 'admin') return session ? <AdminConsole go={go} /> : <Auth go={go} loginFirst />;
-  if (view === 'dashboard') return session ? <Dashboard go={go} /> : <Auth go={go} loginFirst />;
+  if (view === 'auth') return <Auth go={go} session={session} />;
+  if (view === 'admin') return session ? <AdminConsole go={go} /> : <Auth go={go} loginFirst session={session} />;
+  if (view === 'dashboard') return session ? <Dashboard go={go} /> : <Auth go={go} loginFirst session={session} />;
   if (view === 'trends') return <Trends go={go} session={session} />;
-  if (view === 'suggest') return session ? <Suggest go={go} /> : <Auth go={go} loginFirst />;
-  if (view === 'unmask') return session ? <Unmask go={go} /> : <Auth go={go} loginFirst />;
+  if (view === 'suggest') return session ? <Suggest go={go} /> : <Auth go={go} loginFirst session={session} />;
+  if (view === 'unmask') return session ? <Unmask go={go} /> : <Auth go={go} loginFirst session={session} />;
   return <Landing go={go} session={session} />;
 }
 
@@ -161,7 +164,7 @@ function Landing({ go, session }: any) {
 
   return <main className="landing movement-landing">
     <header className="site-head simple-head">
-      <Brand />
+      <Brand onClick={()=>go('landing')} />
       <nav><button onClick={()=>go('trends')}>Live activity</button></nav>
       <button className="btn solid" onClick={()=>go(session?'dashboard':'auth')}>{session?'Enter Unmask':'Join the Unmaskers'}</button>
     </header>
@@ -309,7 +312,7 @@ function Shell({ children, go, active, summary }: any) {
   ];
   return <main className="app-shell">
     <header className="app-head">
-      <Brand />
+      <Brand onClick={()=>go('landing')} />
       <div className="head-right">
         {summary?.isAdmin&&<button className="admin-entry" onClick={()=>go('admin')} title="Open Admin"><FA name="shield-halved"/></button>}
         <CoinPeek amount={summary?.coins||0}/>
@@ -322,7 +325,7 @@ function Shell({ children, go, active, summary }: any) {
   </main>;
 }
 
-function Auth({ go, loginFirst = false }: any) {
+function Auth({ go, loginFirst = false, session = null }: any) {
   const [mode, setMode] = useState(loginFirst ? 'login' : 'signup');
   const [step, setStep] = useState('form');
   const [busy, setBusy] = useState(false);
@@ -375,7 +378,11 @@ function Auth({ go, loginFirst = false }: any) {
 
   return <main className="auth-page">
     <div className="auth-wrap">
-      <Brand />
+      <div className="auth-nav-row">
+        <button className="auth-back" onClick={()=>go('landing')}><FA name="arrow-left"/> Back</button>
+        {session&&<button className="auth-dashboard-return" onClick={()=>go('dashboard')}>Return to dashboard <FA name="arrow-right"/></button>}
+      </div>
+      <Brand onClick={()=>go('landing')} />
       <div className="auth-copy"><span className="eyebrow">{mode === 'signup' ? 'BECOME AN UNMASKER' : 'WELCOME BACK'}</span><h1>{mode === 'signup' ? 'Join the people revealing what products are really like.' : 'Keep unmasking.'}</h1><p>{mode === 'signup' ? 'Share what you have learned from products you have actually used. Help the next person buy smarter.' : 'Your Unmasker mission and community are waiting for you.'}</p></div>
       <div className="auth-tabs"><button className={mode==='signup'?'active':''} onClick={() => {setMode('signup');setStep('form');setNotice(null)}}>Create account</button><button className={mode==='login'?'active':''} onClick={() => {setMode('login');setStep('form');setNotice(null)}}>Log in</button></div>
 
