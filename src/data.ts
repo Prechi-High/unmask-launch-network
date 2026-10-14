@@ -17,7 +17,7 @@ export async function getSummary() {
   if (!auth.user) return null;
   const uid = auth.user.id;
   const [profileRes, countsRes, voteRes, tasksRes] = await Promise.all([
-    supabase.from('profiles').select('display_name,referral_code,created_at,country,region,category_interests,email_verified_custom').eq('id', uid).maybeSingle(),
+    supabase.from('profiles').select('display_name,referral_code,created_at,country,region,category_interests,email_verified_custom,is_admin').eq('id', uid).maybeSingle(),
     supabase.rpc('get_my_launch_counts'),
     supabase.from('launch_category_votes').select('category_id,categories(name)').eq('user_id', uid).maybeSingle(),
     supabase.rpc('get_my_launch_tasks')
@@ -32,7 +32,8 @@ export async function getSummary() {
     voteName: nested?.name || profileRes.data?.category_interests?.[0] || null,
     counts: countsRes.data || {},
     coins: Number(countsRes.data?.coins || 0),
-    tasks: tasksRes.data || []
+    tasks: tasksRes.data || [],
+    isAdmin: Boolean(profileRes.data?.is_admin)
   };
 }
 
