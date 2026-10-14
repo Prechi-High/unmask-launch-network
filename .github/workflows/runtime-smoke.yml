@@ -11,11 +11,12 @@ jobs:
     steps:
       - name: Wait for Vercel production alias
         run: sleep 45
-      - name: Check runtime endpoints
+      - name: Check production runtime
         run: |
           set -x
-          for path in api/ping api/env-check api/mail-check api/crypto-check api/supabase-check api/server-check api/health; do
-            echo "===== $path ====="
-            curl -sS -i --max-time 20 "https://unmask-launch-network.vercel.app/$path" || true
-            echo
-          done
+          curl -sS -i --max-time 20 https://unmask-launch-network.vercel.app/api/ping
+          curl -sS -i --max-time 20 https://unmask-launch-network.vercel.app/api/env-check
+          curl -sS -i --max-time 20 https://unmask-launch-network.vercel.app/api/health
+          curl -sS -i --max-time 20 -X POST https://unmask-launch-network.vercel.app/api/auth/signup \
+            -H 'content-type: application/json' \
+            --data '{}'
