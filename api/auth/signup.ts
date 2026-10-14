@@ -49,8 +49,54 @@ async function sendVerificationEmail(email, code) {
   await transport.sendMail({
     from: 'Unmask <' + from + '>',
     to: email,
-    subject: 'Your Unmask verification code',
-    text: 'Your Unmask verification code is ' + code + '. It expires in 15 minutes.'
+    subject: 'Verify your email • Unmask',
+    text: 'Welcome to Unmask. Your verification code is ' + code + '. It expires in 15 minutes. If you did not create an Unmask account, you can ignore this email.',
+    html: `<!doctype html>
+<html>
+  <body style="margin:0;background:#f6f1ee;font-family:Arial,Helvetica,sans-serif;color:#231b1e;">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;">Your Unmask verification code is ${code}</div>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f1ee;padding:28px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#ffffff;border-radius:20px;overflow:hidden;border:1px solid #eadfd9;">
+            <tr>
+              <td style="background:#701A2E;padding:24px 28px;">
+                <img src="https://unmask-launch-network.vercel.app/resources/unmask-logo.png" alt="Unmask" width="180" style="display:block;max-width:180px;height:auto;">
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:32px 28px 10px;">
+                <div style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#9b6f79;font-weight:700;">Know before you buy.</div>
+                <h1 style="margin:10px 0 12px;font-size:30px;line-height:1.18;color:#261a1e;">Verify your email</h1>
+                <p style="margin:0;font-size:15px;line-height:1.7;color:#665b5f;">Welcome to Unmask. Use the code below to confirm your email and finish becoming an Unmasker.</p>
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="padding:22px 28px 10px;">
+                <div style="display:inline-block;background:#fbf3f5;border:1px solid #ead6dc;border-radius:16px;padding:18px 26px;">
+                  <div style="font-size:11px;color:#8b737b;text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:8px;">Verification code</div>
+                  <div style="font-size:36px;line-height:1;letter-spacing:.18em;font-weight:800;color:#701A2E;">${code}</div>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 28px 26px;">
+                <p style="margin:0 0 8px;font-size:13px;line-height:1.6;color:#756b6e;">This code expires in <strong>15 minutes</strong>.</p>
+                <p style="margin:0;font-size:13px;line-height:1.6;color:#756b6e;">If you didn’t create an Unmask account, you can safely ignore this email.</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="border-top:1px solid #eee5e1;padding:18px 28px 24px;font-size:11px;line-height:1.6;color:#9a8f92;">
+                Unmask — Know before you buy.<br>
+                Real experiences. Clearer decisions.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`
   });
 }
 
