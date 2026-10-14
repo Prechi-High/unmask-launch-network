@@ -11,6 +11,11 @@ import {
   getCommunityStats,
   getMyUnmaskerMission,
   getBuildVisionState,
+  getNotifications,
+  getPushSubscriptionStatus,
+  markAllNotificationsRead,
+  markNotificationRead,
+  savePushSubscription,
   listCategories,
   rewardRules,
   submitExperience,
@@ -24,6 +29,52 @@ const FA = ({ name, className = '' }: { name: string; className?: string }) =>
   <i className={'fa-solid fa-' + name + ' ' + className} aria-hidden="true" />;
 
 const Brand = () => <img className="brand" src="/resources/unmask-logo.png" alt="Unmask — Know before you buy." />;
+
+
+function toUint8Array(base64String:string){
+  const padding='='.repeat((4-base64String.length%4)%4);
+  const base64=(base64String+padding).replace(/-/g,'+').replace(/_/g,'/');
+  const rawData=window.atob(base64);
+  return Uint8Array.from([...rawData].map(char=>char.charCodeAt(0)));
+}
+
+async function enableBrowserPush(){
+  if(!('serviceWorker' in navigator) || !('PushManager' in window)) throw new Error('Push notifications are not supported on this browser.');
+  const permission=await Notification.requestPermission();
+  if(permission!=='granted') throw new Error('Notifications were not allowed. You can enable them later in your browser settings.');
+  const registration=await navigator.serviceWorker.register('/sw.js');
+  await navigator.serviceWorker.ready;
+  let subscription=await registration.pushManager.getSubscription();
+  if(!subscription){
+    const publicKey=import.meta.env.VITE_VAPID_PUBLIC_KEY;
+    if(!publicKey) throw new Error('Push notifications are not ready yet.');
+    subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:toUint8Array(publicKey)});
+  }
+  await savePushSubscription(subscription);
+  return true;
+}
+
+function unmaskShare(item:any){
+  const url=window.location.origin+'/?post='+encodeURIComponent(item.id);
+  const author=item.author_name||'An Unmasker';
+  const text='🕵️ '+author+' unmasked '+item.product_name+'.\n\nSee what really happened with the product — shared by the Unmask community. Know before you buy.\n\n'+url;
+  return {url,text,title:'Unmasked: '+item.product_name};
+}
+
+async function shareNative(item:any){
+  const share=unmaskShare(item);
+  if(navigator.share) return navigator.share({title:share.title,text:share.text,url:share.url});
+  await navigator.clipboard.writeText(share.text);
+}
+
+function shareWhatsApp(item:any){
+  const share=unmaskShare(item);
+  window.open('https://wa.me/?text='+encodeURIComponent(share.text),'_blank','noopener,noreferrer');
+}
+
+async function copyUnmaskLink(item:any){
+  await navigator.clipboard.writeText(unmaskShare(item).text);
+}
 
 function Notice({ tone = 'info', children }: any) {
   const icon = tone === 'success' ? 'circle-check' : tone === 'error' ? 'circle-exclamation' : 'circle-info';
@@ -63,6 +114,9 @@ function App() {
   const [session, setSession] = useState<any>(null);
   const [ready, setReady] = useState(false);
   const [view, setView] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('post')) return 'trends';
+    if (params.get('view') === 'dashboard') return 'dashboard';
     const stored = localStorage.getItem('unmask_view') || 'landing';
     return stored === 'rewards' ? 'dashboard' : stored;
   });
