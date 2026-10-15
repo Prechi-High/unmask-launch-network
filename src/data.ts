@@ -105,11 +105,12 @@ export async function verifyOwnership(input: any) {
 
 export async function submitExperience(input: any) {
   const productId = input.productId || slugify([input.brand, input.productName].filter(Boolean).join(' '));
-  const { data, error } = await supabase.rpc('submit_launch_experience_v2', {
+  const { data, error } = await supabase.rpc('submit_launch_experience_v3', {
     p_product_id: productId,
     p_product_name: input.productName,
     p_brand: input.brand || '',
     p_category: input.category || '',
+    p_product_image: input.productImage || '',
     p_ownership_status: input.ownershipStatus,
     p_used_duration: input.usedDuration,
     p_usage_frequency: input.usageFrequency,
