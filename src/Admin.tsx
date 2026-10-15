@@ -15,7 +15,9 @@ import {
   sendNotificationToUsers,
   getAdminBuildCategories,
   setCategoryTestingUrl,
-  startNewBuildRound
+  startNewBuildRound,
+  getAdminMissionDashboard,
+  saveMission
 } from './adminData';
 import './admin.css';
 
@@ -32,6 +34,7 @@ const NAV=[
   ['rewards','Rewards','coins'],
   ['users','Users','users'],
   ['trends','Trends','chart-column'],
+  ['missions','Missions','bullseye'],
   ['settings','Settings','gear']
 ];
 
@@ -64,7 +67,7 @@ export default function AdminConsole({go}:{go:(view:string)=>void}){
   };
   const loadSection=async(next=section)=>{
     setSelected(null);
-    if(next==='overview'||next==='settings'||next==='trends'){
+    if(next==='overview'||next==='settings'||next==='trends'||next==='missions'){
       setRows([]);
       return;
     }
@@ -144,6 +147,7 @@ export default function AdminConsole({go}:{go:(view:string)=>void}){
         {section==='rewards'&&<RewardsPage data={rows} stats={sectionStats.rewards||{}} selected={selected} setSelected={setSelected} onChanged={()=>refresh('rewards')}/>}
         {section==='users'&&<UsersPage rows={filtered} stats={sectionStats.users||{}} selected={selected} setSelected={setSelected}/>}
         {section==='trends'&&<TrendsPage overview={overview}/>}
+        {section==='missions'&&<MissionsPage setNotice={setNotice}/>}
         {section==='settings'&&<SettingsPage overview={overview} onSaved={()=>refresh('overview')} setNotice={setNotice}/>}
       </div>
     </section>
@@ -287,6 +291,107 @@ function TrendsPage({overview}:any){
     <div className="admin-stats four"><Stat icon="chart-column" label="Category Votes" value={top.reduce((n:number,x:any)=>n+Number(x.votes||0),0)}/><Stat icon="fire" label="Leading Category" value={top[0]?.name||'—'}/><Stat icon="users" label="Active Unmaskers (30d)" value={overview.active_unmaskers_30d}/><Stat icon="cloud-arrow-up" label="Experiences" value={overview.experiences_total}/></div>
     <section className="admin-card admin-trend-card"><CardHead icon="chart-column" title="Category Pulse" sub="Live voting signal from the Unmask community."/><div className="trend-bars">{top.map((c:any,i:number)=><div key={c.id}><span>{i+1}</span><b>{c.name}</b><div><i style={{width:(Number(c.votes||0)/max*100)+'%'}}/></div><strong>{c.votes||0}</strong></div>)}</div></section>
   </>;
+}
+
+function MissionsPage({setNotice}:any){
+  const blank={
+    id:null,
+    sectionTitle:'YOUR DAILY MISSION',
+    heading:'Unmask 3 products you know.',
+    subtext:'Pick products you have actually used and leave the truth behind for the next buyer.',
+    targetCount:3,
+    startsAt:new Date().toISOString().slice(0,16),
+    endsAt:'',
+    active:true
+  };
+  const [dashboard,setDashboard]=useState<any>({missions:[]});
+  const [form,setForm]=useState<any>(blank);
+  const [busy,setBusy]=useState(false);
+
+  const load=()=>getAdminMissionDashboard().then(setDashboard);
+  useEffect(()=>{load().catch(()=>undefined)},[]);
+
+  const edit=(m:any)=>setForm({
+    id:m.id,
+    sectionTitle:m.section_title,
+    heading:m.heading,
+    subtext:m.subtext,
+    targetCount:m.target_count,
+    startsAt:m.starts_at?new Date(m.starts_at).toISOString().slice(0,16):'',
+    endsAt:m.ends_at?new Date(m.ends_at).toISOString().slice(0,16):'',
+    active:Boolean(m.active)
+  });
+
+  const save=async()=>{
+    setBusy(true);
+    try{
+      await saveMission(form);
+      await load();
+      setNotice(form.id?'Mission updated.':'New mission published.');
+      setForm({...blank,startsAt:new Date().toISOString().slice(0,16)});
+    }catch(e:any){setNotice(e.message||'Could not save mission.')}
+    finally{setBusy(false)}
+  };
+
+  const missions=dashboard?.missions||[];
+  const active=missions.find((m:any)=>m.active && new Date(m.starts_at)<=new Date() && (!m.ends_at||new Date(m.ends_at)>new Date()));
+  const viewers=Number(active?.viewers||0);
+  const participants=Number(active?.participants||0);
+  const completed=Number(active?.completed_users||0);
+  const participationRate=viewers?Math.round((participants/viewers)*100):0;
+  const completionRate=participants?Math.round((completed/participants)*100):0;
+
+  return <div className="mission-admin-stack">
+    <div className="admin-stats four">
+      <Stat icon="eye" label="Mission Viewers" value={viewers}/>
+      <Stat icon="person-running" label="Participants" value={participants}/>
+      <Stat icon="percent" label="Participation Rate" value={participationRate+'%'}/>
+      <Stat icon="circle-check" label="Completed" value={completed} sub={completionRate+'% of participants'}/>
+    </div>
+
+    <div className="admin-grid mission-admin-grid">
+      <section className="admin-card mission-editor">
+        <CardHead icon="bullseye" title={form.id?'Edit Mission':'Create Mission'} sub="This controls the mission card shown on every Unmasker dashboard."/>
+        <div className="mission-editor-form">
+          <label>Section title<input value={form.sectionTitle} onChange={e=>setForm({...form,sectionTitle:e.target.value})} placeholder="YOUR DAILY MISSION"/></label>
+          <label>Heading / hero text<input value={form.heading} onChange={e=>setForm({...form,heading:e.target.value})} placeholder="Unmask 5 products today."/></label>
+          <label className="wide">Sub text<textarea value={form.subtext} onChange={e=>setForm({...form,subtext:e.target.value})} placeholder="Explain the mission clearly."/></label>
+          <label>Target<input type="number" min="1" max="50" value={form.targetCount} onChange={e=>setForm({...form,targetCount:Number(e.target.value)})}/></label>
+          <label>Starts<input type="datetime-local" value={form.startsAt} onChange={e=>setForm({...form,startsAt:e.target.value})}/></label>
+          <label>Ends (optional)<input type="datetime-local" value={form.endsAt} onChange={e=>setForm({...form,endsAt:e.target.value})}/></label>
+          <label className="mission-active"><input type="checkbox" checked={form.active} onChange={e=>setForm({...form,active:e.target.checked})}/> Make this the active mission</label>
+        </div>
+
+        <div className="mission-preview">
+          <span>{form.sectionTitle||'MISSION'}</span>
+          <div><h3>{form.heading||'Mission heading'}</h3><strong>0/{Number(form.targetCount||0)}</strong></div>
+          <p>{form.subtext||'Mission description'}</p>
+          <div className="mission-preview-track">{Array.from({length:Math.min(Number(form.targetCount||0),12)}).map((_,i)=><i key={i}>{i+1}</i>)}</div>
+          {Number(form.targetCount||0)>12&&<small>+ {Number(form.targetCount||0)-12} more progress steps</small>}
+        </div>
+
+        <div className="mission-editor-actions">
+          {form.id&&<button className="secondary" onClick={()=>setForm({...blank,startsAt:new Date().toISOString().slice(0,16)})}>Create new instead</button>}
+          <button className="primary" disabled={busy||!form.sectionTitle.trim()||!form.heading.trim()||!form.subtext.trim()||form.targetCount<1} onClick={save}>{busy?'Saving…':form.id?'Save mission':'Publish mission'}</button>
+        </div>
+      </section>
+
+      <section className="admin-card mission-history">
+        <CardHead icon="clock-rotate-left" title="Mission History" sub="Live participation data for every mission you have run."/>
+        <div className="mission-history-list">
+          {!missions.length&&<div className="recipient-empty">No missions yet.</div>}
+          {missions.map((m:any)=>{
+            const seen=Number(m.viewers||0),joined=Number(m.participants||0),done=Number(m.completed_users||0);
+            const rate=seen?Math.round(joined/seen*100):0;
+            return <button key={m.id} onClick={()=>edit(m)} className={m.active?'active':''}>
+              <div className="mission-history-main"><span>{m.section_title}</span><b>{m.heading}</b><small>{fmtDate(m.starts_at)}{m.ends_at?' → '+fmtDate(m.ends_at):''}</small></div>
+              <div className="mission-history-metrics"><em>{seen}<small>saw</small></em><em>{joined}<small>joined</small></em><em>{done}<small>done</small></em><strong>{rate}%<small>participation</small></strong></div>
+            </button>
+          })}
+        </div>
+      </section>
+    </div>
+  </div>;
 }
 
 function SettingsPage({overview,onSaved,setNotice}:any){
