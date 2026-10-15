@@ -560,7 +560,7 @@ function CategoryVoteModal({ categories, trends, currentVote, onClose, onVote, b
   const selectedCategory=categories.find((c:any)=>c.id===selected);
   const votesFor=(name:string)=>trends?.categories?.find((x:any)=>x.name===name)?.votes||0;
 
-  return <div className="modal-backdrop" onMouseDown={onClose}>
+  return <div className="category-picker-shell" onMouseDown={onClose}>
     <section className="category-modal" onMouseDown={e=>e.stopPropagation()}>
       <div className="modal-grip"/>
       <div className="modal-title-row"><div><span className="eyebrow">YOUR VOTE SHAPES THE BUILD</span><h2>What should Unmask build first?</h2><p>Pick the category you most want us to unlock. You can change your vote while voting is open.</p></div><button className="modal-close" onClick={onClose}><FA name="xmark"/></button></div>
