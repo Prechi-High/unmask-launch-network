@@ -69,7 +69,7 @@
 .invite-strip{width:100%;margin-top:11px;border:1px solid #eadfd9;background:#fff;border-radius:17px;padding:13px;display:grid;grid-template-columns:44px 1fr 16px;gap:10px;align-items:center;text-align:left}.invite-strip>span{width:44px;height:44px;border-radius:13px;background:#f6e7eb;color:var(--wine);display:grid;place-items:center}.invite-strip>div{display:grid}.invite-strip small{font-size:10px;color:#7d7578}
 
 /* category voting modal */
-.modal-backdrop{position:fixed;inset:0;z-index:100;background:#17040bb0;backdrop-filter:blur(5px);display:flex;align-items:flex-end;justify-content:center;padding:18px}
+.category-picker-shell{position:fixed;inset:0;z-index:2000;background:transparent;display:flex;align-items:flex-end;justify-content:center;padding:18px}
 .category-modal{width:min(780px,100%);max-height:88vh;overflow:auto;background:#fff;border-radius:26px;padding:20px;box-shadow:0 35px 90px #13030966;animation:modalUp .22s ease-out}
 @keyframes modalUp{from{transform:translateY(25px);opacity:.6}to{transform:translateY(0);opacity:1}}
 .modal-grip{width:46px;height:5px;border-radius:999px;background:#d9cfcb;margin:-6px auto 13px}.modal-title-row{display:grid;grid-template-columns:1fr auto;gap:12px}.modal-title-row h2{font-family:Georgia,serif;font-size:34px;line-height:1.02;margin:7px 0}.modal-title-row p{font-size:12px;color:#6e7479;line-height:1.45;max-width:570px}.modal-close{width:38px;height:38px;border:0;border-radius:50%;background:#f4eeeb;color:var(--wine)}
@@ -83,7 +83,7 @@
   .heat-category-main{grid-template-columns:76px minmax(0,1fr) 43px 14px;gap:9px;padding:8px}.heat-image-wrap{height:68px}.heat-name-row h3{font-size:15px}.pulse-visual{gap:2px}.pulse-visual i{width:4px}.heat-product-grid{grid-template-columns:1fr}.heat-product{grid-template-columns:24px 38px minmax(0,1fr) auto}.heat-products-head{align-items:flex-start}
   .decision-zone{min-height:320px}.decision-bg img{width:34%}.decision-content{padding:22px 18px;max-width:82%}.decision-content h2{font-size:31px}.decision-count{right:10px;top:10px}
   .banner-grid{grid-template-columns:1fr}.action-banner{min-height:155px}.banner-copy>b{font-size:18px}
-  .modal-backdrop{padding:0;align-items:flex-end}.category-modal{border-radius:24px 24px 0 0;padding:16px;max-height:91vh}.modal-title-row h2{font-size:29px}.category-modal-grid{grid-template-columns:1fr 1fr}.category-modal-card{height:120px}
+  .category-picker-shell{padding:0;align-items:flex-end}.category-modal{border-radius:24px 24px 0 0;padding:16px;max-height:91vh}.modal-title-row h2{font-size:29px}.category-modal-grid{grid-template-columns:1fr 1fr}.category-modal-card{height:120px}
   .public-trends{padding:22px 14px 90px}
 }
 
@@ -435,11 +435,6 @@
   display:none!important;
   content:none!important;
 }
-/* Category picker no longer darkens the page behind it. */
-.modal-backdrop{
-  background:transparent!important;
-  backdrop-filter:none!important;
-}
 
 /* Build progress v2 */
 .build-progress-v2 .build-why,
@@ -667,4 +662,36 @@
   .build-current-action .btn{width:100%}
   .build-round-meta{display:grid}
   .build-round-meta>small{margin-left:0}
+}
+
+/* Dashboard stacking guard: user content must never be covered by a dimming layer. */
+.app-shell{
+  position:relative;
+  isolation:isolate;
+}
+.app-body{
+  position:relative!important;
+  z-index:1!important;
+  opacity:1!important;
+  filter:none!important;
+  -webkit-filter:none!important;
+  mix-blend-mode:normal!important;
+}
+.app-body > *{
+  position:relative;
+  z-index:2;
+  opacity:1!important;
+  filter:none!important;
+  -webkit-filter:none!important;
+}
+.app-head{
+  z-index:1000!important;
+}
+.bottom-nav{
+  z-index:1000!important;
+}
+.category-picker-shell{
+  background:transparent!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
 }
