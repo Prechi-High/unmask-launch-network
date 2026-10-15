@@ -17,7 +17,7 @@ export async function getSummary() {
   if (!auth.user) return null;
   const uid = auth.user.id;
   const [profileRes, countsRes, voteRes, tasksRes] = await Promise.all([
-    supabase.from('profiles').select('display_name,referral_code,created_at,country,region,category_interests,email_verified_custom,is_admin').eq('id', uid).maybeSingle(),
+    supabase.from('profiles').select('display_name,avatar_url,referral_code,created_at,country,region,category_interests,email_verified_custom,is_admin').eq('id', uid).maybeSingle(),
     supabase.rpc('get_my_launch_counts'),
     supabase.from('launch_category_votes').select('category_id,categories(name)').eq('user_id', uid).maybeSingle(),
     supabase.rpc('get_my_launch_tasks')
@@ -28,6 +28,7 @@ export async function getSummary() {
     userId: uid,
     email: auth.user.email || '',
     displayName: profileRes.data?.display_name || auth.user.email?.split('@')[0] || 'Unmasker',
+    avatarUrl: profileRes.data?.avatar_url || null,
     referralCode: profileRes.data?.referral_code || null,
     voteName: nested?.name || profileRes.data?.category_interests?.[0] || null,
     counts: countsRes.data || {},
@@ -204,4 +205,32 @@ export async function getPushSubscriptionStatus() {
   const { data, error } = await supabase.from('push_subscriptions').select('id').eq('user_id', auth.user.id).eq('enabled', true).limit(1);
   if (error) throw error;
   return Boolean(data?.length);
+}
+
+
+export async function uploadProfileAvatar(file:File){
+  const { data: auth } = await supabase.auth.getUser();
+  if(!auth.user) throw new Error('Please log in first.');
+  if(!file.type.startsWith('image/')) throw new Error('Choose an image file.');
+  if(file.size>5*1024*1024) throw new Error('Profile image must be 5MB or smaller.');
+
+  const ext=(file.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'')||'jpg';
+  const path=auth.user.id+'/avatar-'+Date.now()+'.'+ext;
+
+  const { error: uploadError } = await supabase.storage
+    .from('avatars')
+    .upload(path,file,{upsert:true,contentType:file.type,cacheControl:'3600'});
+  if(uploadError) throw uploadError;
+
+  const { data } = supabase.storage.from('avatars').getPublicUrl(path);
+  const url=data.publicUrl;
+
+  const { error } = await supabase.rpc('update_my_avatar',{p_avatar_url:url});
+  if(error) throw error;
+  return url;
+}
+
+export async function logout(){
+  const { error } = await supabase.auth.signOut();
+  if(error) throw error;
 }
