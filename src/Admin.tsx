@@ -12,7 +12,10 @@ import {
   updateExperienceStatus,
   updateRequestStatus,
   updateRewardRule,
-  sendNotificationToUsers
+  sendNotificationToUsers,
+  getAdminBuildCategories,
+  setCategoryTestingUrl,
+  startNewBuildRound
 } from './adminData';
 import './admin.css';
 
@@ -290,6 +293,8 @@ function SettingsPage({overview,onSaved,setNotice}:any){
   const [rewards,setRewards]=useState<any[]>([]);
   const [categories,setCategories]=useState<any[]>([]);
   const [users,setUsers]=useState<any[]>([]);
+  const [testingUrl,setTestingUrl]=useState('');
+  const [nextRound,setNextRound]=useState({title:'Next Unmask category',ends:''});
   const [phase,setPhase]=useState(overview.build_round?.phase||'voting');
   const [ends,setEnds]=useState(overview.build_round?.voting_ends_at?new Date(overview.build_round.voting_ends_at).toISOString().slice(0,16):'');
   const [selectedCategory,setSelectedCategory]=useState(overview.build_round?.selected_category_id||'');
@@ -300,11 +305,13 @@ function SettingsPage({overview,onSaved,setNotice}:any){
   const [busy,setBusy]=useState('');
 
   useEffect(()=>{
-    Promise.all([getAdminSection('rewards'),getAdminSection('categories'),getAdminSection('users',500)])
+    Promise.all([getAdminSection('rewards'),getAdminBuildCategories(),getAdminSection('users',500)])
       .then(([r,c,u])=>{
         setRewards(r.rules||[]);
         setCategories(c||[]);
         setUsers(Array.isArray(u)?u:[]);
+        const active=(c||[]).find((x:any)=>x.id===overview.build_round?.selected_category_id);
+        setTestingUrl(active?.testing_url||'');
       });
   },[]);
 
@@ -326,7 +333,21 @@ function SettingsPage({overview,onSaved,setNotice}:any){
     setBusy('build');
     try{
       await updateBuildRound(phase,ends?new Date(ends).toISOString():null,selectedCategory||null);
-      setNotice('Build round updated. Community notifications will follow stage changes.');
+      if(selectedCategory) await setCategoryTestingUrl(selectedCategory,testingUrl);
+      setNotice('Build round updated.');
+      onSaved();
+    }finally{setBusy('')}
+  };
+
+  const createNextRound=async()=>{
+    if(!nextRound.ends) return;
+    setBusy('next-round');
+    try{
+      await startNewBuildRound(nextRound.title,nextRound.ends);
+      setPhase('voting');
+      setSelectedCategory('');
+      setTestingUrl('');
+      setNotice('New build round started. The previous live category remains shown as completed.');
       onSaved();
     }finally{setBusy('')}
   };
@@ -369,7 +390,23 @@ function SettingsPage({overview,onSaved,setNotice}:any){
 
     <section className="admin-card settings-block"><CardHead icon="coins" title="Social Coin Rewards" sub="Control what following Unmask on social platforms earns."/><div className="settings-rows">{rewards.filter((r:any)=>['follow_x','follow_tiktok'].includes(r.key)).map((r:any)=><div key={r.key}><div><b>{r.title||r.key}</b><small>{r.description}</small></div><input type="number" min="0" value={r.coin_amount} onChange={e=>setRewards(xs=>xs.map((x:any)=>x.key===r.key?{...x,coin_amount:e.target.value}:x))}/><label className="toggle"><input type="checkbox" checked={r.active} onChange={e=>setRewards(xs=>xs.map((x:any)=>x.key===r.key?{...x,active:e.target.checked}:x))}/><span/></label></div>)}</div><button className="settings-save" disabled={busy==='rewards'} onClick={saveRewards}>{busy==='rewards'?'Saving…':'Save reward settings'}</button></section>
 
-    <section className="admin-card settings-block"><CardHead icon="hammer" title="Build Round & Category Voting" sub="Move the community through Vote → Selected → Building → Testing → Live."/><div className="settings-form-grid"><label>Current phase<select value={phase} onChange={e=>setPhase(e.target.value)}><option value="voting">Voting</option><option value="selecting">Selected</option><option value="building">Building</option><option value="testing">Testing</option><option value="live">Live</option></select></label><label>Voting ends<input type="datetime-local" value={ends} onChange={e=>setEnds(e.target.value)}/></label><label>Selected category<select value={selectedCategory} onChange={e=>setSelectedCategory(e.target.value)}><option value="">No category selected</option>{categories.map((c:any)=><option value={c.id} key={c.id}>{c.name} · {c.votes||0} votes</option>)}</select></label></div><button className="settings-save" disabled={busy==='build'} onClick={saveBuild}>{busy==='build'?'Saving…':'Update build round'}</button></section>
+    <section className="admin-card settings-block">
+      <CardHead icon="hammer" title="Build Round & Category Voting" sub="Control the category currently moving through Vote → Selected → Building → Testing → Live."/>
+      <div className="settings-form-grid">
+        <label>Current phase<select value={phase} onChange={e=>setPhase(e.target.value)}><option value="voting">Voting</option><option value="selecting">Selected</option><option value="building">Building</option><option value="testing">Testing</option><option value="live">Live</option></select></label>
+        <label>Voting ends<input type="datetime-local" value={ends} onChange={e=>setEnds(e.target.value)}/></label>
+        <label>Selected category<select value={selectedCategory} onChange={e=>{const id=e.target.value;setSelectedCategory(id);setTestingUrl(categories.find((c:any)=>c.id===id)?.testing_url||'')}}><option value="">No category selected</option>{categories.map((c:any)=><option value={c.id} key={c.id}>{c.name}</option>)}</select></label>
+        <label className="settings-wide">Testing link<input type="url" placeholder="https://..." value={testingUrl} onChange={e=>setTestingUrl(e.target.value)}/><small>Shown to Unmaskers only when this category reaches Testing.</small></label>
+      </div>
+      <button className="settings-save" disabled={busy==='build'} onClick={saveBuild}>{busy==='build'?'Saving…':'Update build round'}</button>
+
+      <div className="next-round-box">
+        <div><b>Start another category round</b><small>Use this after a category is live. The finished category stays visible as completed while a new category starts at Vote.</small></div>
+        <input value={nextRound.title} onChange={e=>setNextRound({...nextRound,title:e.target.value})} placeholder="Round title"/>
+        <input type="datetime-local" value={nextRound.ends} onChange={e=>setNextRound({...nextRound,ends:e.target.value})}/>
+        <button disabled={busy==='next-round'||!nextRound.ends} onClick={createNextRound}>{busy==='next-round'?'Starting…':'Start new round'}</button>
+      </div>
+    </section>
 
     <section className="admin-card settings-block notification-builder">
       <CardHead icon="bell" title="Send Notification" sub="Send to everyone, one specific Unmasker, or a hand-picked group."/>
