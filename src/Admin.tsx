@@ -10,6 +10,7 @@ import {
   updateCategory,
   updateCollaborationStatus,
   updateExperienceStatus,
+  deleteExperience,
   updateRequestStatus,
   updateRewardRule,
   sendNotificationToUsers,
@@ -218,9 +219,17 @@ function RequestsPage({rows,stats,selected,setSelected,onChanged}:any){
 
 function ExperiencesPage({rows,stats,selected,setSelected,onChanged}:any){
   const change=async(id:string,status:string)=>{await updateExperienceStatus(id,status);onChanged()};
+  const remove=async()=>{
+    if(!selected)return;
+    const ok=window.confirm('Delete this experience permanently? This cannot be undone.');
+    if(!ok)return;
+    await deleteExperience(selected.id);
+    setSelected(null);
+    onChanged();
+  };
   return <>
     <div className="admin-stats four"><Stat icon="cloud-arrow-up" label="Total Experiences" value={stats.total||0}/><Stat icon="clock" label="Needs Review" value={stats.needs_review||0}/><Stat icon="circle-check" label="Published" value={stats.published||0}/><Stat icon="flag" label="Flagged" value={stats.flagged||0}/></div>
-    <TableLayout detail={selected&&<><DetailTitle icon="file-lines" title="Experience Detail"/><h3>{selected.product_name}</h3><p>{selected.brand||''} {selected.category?'· '+selected.category:''}</p><Info label="Submitted by" value={selected.author_name}/><Info label="Ownership" value={selected.ownership_status}/><Info label="Duration" value={selected.used_duration}/><Info label="Status" value={selected.moderation_status}/><h4>User's experience</h4><p>{selected.body}</p><div className="detail-actions"><button onClick={()=>change(selected.id,'published')}>Approve & publish</button><button onClick={()=>change(selected.id,'review')}>Move to review</button><button onClick={()=>change(selected.id,'flagged')}>Flag</button><button onClick={()=>change(selected.id,'rejected')}>Reject</button></div></>}>
+    <TableLayout detail={selected&&<><DetailTitle icon="file-lines" title="Experience Detail"/><h3>{selected.product_name}</h3><p>{selected.brand||''} {selected.category?'· '+selected.category:''}</p><Info label="Submitted by" value={selected.author_name}/><Info label="Ownership" value={selected.ownership_status}/><Info label="Duration" value={selected.used_duration}/><Info label="Status" value={selected.moderation_status}/><h4>User's experience</h4><p>{selected.body}</p><div className="detail-actions"><button onClick={()=>change(selected.id,'published')}>Approve & publish</button><button onClick={()=>change(selected.id,'review')}>Move to review</button><button onClick={()=>change(selected.id,'flagged')}>Flag</button><button onClick={()=>change(selected.id,'rejected')}>Reject</button></div><button className="detail-delete-btn" onClick={remove}><FA name="trash"/> Delete experience</button></>}>
       <CardHead icon="file-lines" title="All Uploads & Experiences" sub="Review, moderate, and organise user-submitted product experiences."/>
       <AdminTable headers={['Product','User','Category','Experience Summary','Ownership','Status','Submitted']}>{rows.map((r:any)=><tr key={r.id} onClick={()=>setSelected(r)}><td><b>{r.product_name}</b><small>{r.brand}</small></td><td>{r.author_name}</td><td>{r.category||'—'}</td><td className="clamp">{r.body}</td><td>{r.ownership_status}</td><td><Pill>{r.moderation_status}</Pill></td><td>{fmtDate(r.created_at)}</td></tr>)}</AdminTable>
     </TableLayout>
