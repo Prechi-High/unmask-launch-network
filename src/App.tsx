@@ -303,8 +303,8 @@ function NotificationCenter({ userId, go }:any){
             <p>{selectedNotification.payload?.body||'There is something new in the Unmask community.'}</p>
             <small className="notification-detail-time">{new Date(selectedNotification.created_at).toLocaleString(undefined,{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</small>
 
-            {selectedNotification.payload?.link&&<button className="notification-detail-action" onClick={()=>followNotificationLink(selectedNotification)}>
-              {selectedNotification.type==='helpful'?'View unmasking':'Open related page'} <FA name="arrow-right"/>
+            {selectedNotification.type==='helpful'&&selectedNotification.payload?.link&&<button className="notification-detail-action" onClick={()=>followNotificationLink(selectedNotification)}>
+              View unmasking <FA name="arrow-right"/>
             </button>}
           </div>
         : <>
@@ -623,13 +623,14 @@ function BuildRoadmap({ buildState, currentVote, onVote, compact=false }:any) {
   const phase=round.phase||'voting';
   const activeIndex=Math.max(0,BUILD_STEPS.findIndex(([key])=>key===phase));
   const selected=buildState?.categories?.find((c:any)=>c.id===round.selected_category_id);
+  const completed=(buildState?.completed_categories||[]).filter((c:any)=>c.id!==selected?.id);
 
-  return <section className={'build-vision '+(compact?'compact':'')}>
+  return <section className={'build-vision build-progress-v2 '+(compact?'compact':'')}>
     <div className="build-vision-top">
       <div>
-        <span className="build-kicker"><FA name="hammer"/> WE ARE BUILDING UNMASK WITH YOU</span>
-        <h2>We’re building the tool Unmaskers will use before they buy.</h2>
-        <p>Take a picture of a product. Unmask what people actually experienced. Make a better buying decision. We’re building that experience category by category so every one can go deep.</p>
+        <span className="build-kicker"><FA name="hammer"/> BUILDING UNMASK CATEGORY BY CATEGORY</span>
+        <h2>See exactly what we’re building now.</h2>
+        <p>Each category moves through five clear stages. When one reaches Live, it stays in our completed list while the next category begins its own journey.</p>
       </div>
       <div className="future-tool-card">
         <span><FA name="camera"/></span>
@@ -637,31 +638,56 @@ function BuildRoadmap({ buildState, currentVote, onVote, compact=false }:any) {
       </div>
     </div>
 
-    <div className="build-why">
-      <div><FA name="people-group"/><b>Your unmaskings are not random posts.</b><span>They are helping us learn what matters inside each product category.</span></div>
-      <div><FA name="flask"/><b>You’ll be among the first testers.</b><span>The community helping shape this gets first access when a category reaches testing.</span></div>
-      <div><FA name="layer-group"/><b>You decide where we start.</b><span>Vote for the category you most want the full Unmask experience built for first.</span></div>
-    </div>
+    {!!completed.length&&<div className="completed-builds">
+      <span>COMPLETED</span>
+      <div>{completed.map((c:any)=><article key={c.id}><FA name="circle-check"/><div><b>{c.name}</b><small>Live on Unmask</small></div></article>)}</div>
+    </div>}
 
-    <div className="build-roadmap">
-      {BUILD_STEPS.map(([key,label,body],i)=><article key={key} className={(i<activeIndex?'done ':'')+(i===activeIndex?'active ':'')}>
-        <span className="roadmap-node">{i<activeIndex?<FA name="check"/>:i+1}</span>
-        <div><b>{label}</b><small>{body}</small></div>
-      </article>)}
-    </div>
-
-    <div className="build-round-card">
-      <div className="round-copy">
-        <span className="eyebrow">{phase==='voting'?'CURRENT ROUND — VOTING IS OPEN':'CURRENT BUILD ROUND'}</span>
-        <h3>{selected?selected.name+' is moving forward':'Which category should we build first?'}</h3>
-        <p>{phase==='voting'?'Cast your vote before the round closes. The winning signal helps decide where the first deep Unmask experience goes.':'Follow the category from selection through build, testing and launch.'}</p>
-        {currentVote&&phase==='voting'&&<div className="vote-status"><FA name="circle-check"/>Your vote: <b>{currentVote}</b></div>}
-        {phase==='voting'&&<button className="btn solid" onClick={onVote}>{currentVote?'Change my vote':'Vote for a category'} <FA name="arrow-right"/></button>}
+    <div className="current-build-card">
+      <div className="current-build-heading">
+        <div>
+          <span className="eyebrow">{selected?'CURRENT CATEGORY':'CURRENT ROUND'}</span>
+          <h3>{selected?selected.name:(phase==='voting'?'Choosing the next category':'Category not selected yet')}</h3>
+          <p>{selected
+            ? 'Follow '+selected.name+' as it moves from selection to a full Unmask category.'
+            : 'Unmaskers are choosing which category should move through the build next.'}</p>
+        </div>
+        <span className={'build-stage-badge stage-'+phase}>{BUILD_STEPS[activeIndex]?.[1]||'Vote'}</span>
       </div>
-      <div className="round-timer">
-        <span>{phase==='voting'?'Voting closes in':'Current stage'}</span>
-        {phase==='voting'?<Countdown endsAt={round.voting_ends_at}/>:<strong>{BUILD_STEPS[activeIndex]?.[1]||'Building'}</strong>}
-        <small>{buildState?.experiences_gathered||0} real product experiences already gathered by Unmaskers</small>
+
+      <div className="build-stage-track">
+        {BUILD_STEPS.map(([key,label],i)=>{
+          const done=i<activeIndex || (phase==='live'&&i===activeIndex);
+          const active=i===activeIndex;
+          return <article key={key} className={(done?'done ':'')+(active?'active ':'')}>
+            <span>{done?<FA name="check"/>:i+1}</span>
+            <b>{label}</b>
+            {i<BUILD_STEPS.length-1&&<i/>}
+          </article>
+        })}
+      </div>
+
+      <div className="build-current-action">
+        <div>
+          <b>{BUILD_STEPS[activeIndex]?.[1]||'Vote'}</b>
+          <span>{BUILD_STEPS[activeIndex]?.[2]}</span>
+        </div>
+
+        {phase==='voting'&&<>
+          {currentVote&&<div className="vote-status"><FA name="circle-check"/>Your vote: <b>{currentVote}</b></div>}
+          <button className="btn solid" onClick={onVote}>{currentVote?'Change my vote':'Vote for a category'} <FA name="arrow-right"/></button>
+        </>}
+
+        {phase==='testing'&&selected?.testing_url&&<a className="btn solid build-test-btn" href={selected.testing_url} target="_blank" rel="noreferrer">
+          Test {selected.name} <FA name="arrow-up-right-from-square"/>
+        </a>}
+
+        {phase==='testing'&&!selected?.testing_url&&<span className="testing-wait">Testing access is being prepared.</span>}
+      </div>
+
+      <div className="build-round-meta">
+        {phase==='voting'?<><span>Voting closes in</span><Countdown endsAt={round.voting_ends_at}/></>:<><span>Current status</span><strong>{BUILD_STEPS[activeIndex]?.[1]||'Building'}</strong></>}
+        <small>{buildState?.experiences_gathered||0} real product experiences gathered by Unmaskers</small>
       </div>
     </div>
   </section>;
@@ -722,7 +748,7 @@ function Dashboard({ go }: any) {
 
   const refresh=async()=>{
     const [sm,st,mi,fd,tr,ca,bs]=await Promise.all([
-      getSummary(),getCommunityStats(),getMyUnmaskerMission(),getCommunityFeed(12),getLaunchTrends(),listCategories(),getBuildVisionState()
+      getSummary(),getCommunityStats(),getMyUnmaskerMission(),getCommunityFeed(5),getLaunchTrends(),listCategories(),getBuildVisionState()
     ]);
     setSummary(sm);setStats(st);setMission(mi);setFeed(fd);setTrends(tr);setCategories(ca);setBuildState(bs);
   };
@@ -731,7 +757,7 @@ function Dashboard({ go }: any) {
     refresh().catch(()=>undefined);
     const channel=supabase.channel('unmasker-home-live')
       .on('postgres_changes',{event:'*',schema:'public',table:'ownership_notes'},()=>refresh())
-      .on('postgres_changes',{event:'*',schema:'public',table:'unmask_post_likes'},()=>getCommunityFeed(12).then(setFeed).catch(()=>undefined))
+      .on('postgres_changes',{event:'*',schema:'public',table:'unmask_post_likes'},()=>getCommunityFeed(5).then(setFeed).catch(()=>undefined))
       .on('postgres_changes',{event:'*',schema:'public',table:'launch_category_votes'},()=>refresh())
       .subscribe();
     return()=>{supabase.removeChannel(channel)};
@@ -826,6 +852,7 @@ function Dashboard({ go }: any) {
         <span className="community-count">{stats.unmasked_total||0} experiences shared</span>
       </div>
       <CommunityFeed items={feed} onLike={like}/>
+      <div className="community-view-more"><button className="btn ghost" onClick={()=>go('trends')}>View more unmaskings <FA name="arrow-right"/></button></div>
     </section>
 
     <BuildRoadmap buildState={buildState} currentVote={summary?.voteName} onVote={()=>setShowCategoryPicker(true)}/>
@@ -901,12 +928,12 @@ function Trends({ go, session }: any) {
       <div><strong>{trends.total_suggestions||0}</strong><small>product requests</small></div>
     </section>
 
+    <LiveTrendBoard data={trends} go={go} full/>
+
     <section className="community-now trends-community">
       <div className="section-head compact"><div><div className="live-label"><span className="live-dot"/><b>RECENT UNMASKINGS</b></div><h2>What people have been through with their products.</h2></div></div>
       <CommunityFeed items={feed} onLike={like} publicView={!session}/>
     </section>
-
-    <LiveTrendBoard data={trends} go={go} full/>
   </>;
 
   return session?<Shell go={go} active="trends" summary={summary}>{content}</Shell>:<main className="landing"><header className="site-head simple-head"><Brand/><button className="btn solid" onClick={()=>go('auth')}>Join the Unmaskers</button></header><div className="public-trends">{content}</div></main>;
