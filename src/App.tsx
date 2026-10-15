@@ -62,158 +62,19 @@ async function enableBrowserPush(){
 function unmaskShare(item:any){
   const url=window.location.origin+'/?post='+encodeURIComponent(item.id);
   const author=item.author_name||'An Unmasker';
-  const product=item.product_name||'a product';
-  const text='🕵️ '+author+' unmasked '+product+'.\n\nSee what really happened with the product — shared by the Unmask community. Know before you buy.\n\n'+url;
-  return {url,text,title:'Unmasked: '+product};
-}
-
-function canvasWrap(ctx:CanvasRenderingContext2D,text:string,maxWidth:number,maxLines:number){
-  const words=String(text||'').trim().split(/\s+/).filter(Boolean);
-  const lines:string[]=[];
-  let line='';
-  for(const word of words){
-    const next=line?line+' '+word:word;
-    if(ctx.measureText(next).width>maxWidth && line){
-      lines.push(line);
-      line=word;
-      if(lines.length>=maxLines-1) break;
-    }else line=next;
-  }
-  if(line&&lines.length<maxLines) lines.push(line);
-  if(words.join(' ').length>lines.join(' ').length&&lines.length){
-    lines[lines.length-1]=lines[lines.length-1].replace(/[. ]*$/,'')+'…';
-  }
-  return lines;
-}
-
-async function loadCanvasImage(src:string){
-  return await new Promise<HTMLImageElement>((resolve,reject)=>{
-    const img=new Image();
-    img.onload=()=>resolve(img);
-    img.onerror=()=>reject(new Error('image_load_failed'));
-    img.crossOrigin='anonymous';
-    img.src=src;
-  });
-}
-
-async function createBrandedShareCard(item:any){
-  const share=unmaskShare(item);
-  const canvas=document.createElement('canvas');
-  canvas.width=1080;canvas.height=1350;
-  const ctx=canvas.getContext('2d');
-  if(!ctx) throw new Error('Could not create branded share card.');
-
-  const bg=ctx.createLinearGradient(0,0,1080,1350);
-  bg.addColorStop(0,'#27060E');
-  bg.addColorStop(.56,'#701A2E');
-  bg.addColorStop(1,'#18050B');
-  ctx.fillStyle=bg;ctx.fillRect(0,0,1080,1350);
-
-  const glow=ctx.createRadialGradient(875,180,40,875,180,440);
-  glow.addColorStop(0,'rgba(238,140,124,.30)');
-  glow.addColorStop(1,'rgba(238,140,124,0)');
-  ctx.fillStyle=glow;ctx.fillRect(0,0,1080,760);
-
-  let logo:HTMLImageElement|null=null;
-  try{logo=await loadCanvasImage('/resources/unmask-favicon.png')}catch{}
-  if(logo) ctx.drawImage(logo,72,62,116,116);
-
-  ctx.fillStyle='#fff';ctx.font='800 67px Arial, sans-serif';ctx.fillText('Unmask',220,130);
-  ctx.fillStyle='#EADDE1';ctx.font='500 26px Arial, sans-serif';ctx.fillText('Know before you buy.',222,170);
-  ctx.fillStyle='#F5A9BA';ctx.font='800 18px Arial, sans-serif';ctx.letterSpacing='4px';
-  ctx.fillText('SHARED FROM THE UNMASK COMMUNITY',76,235);
-  ctx.letterSpacing='0px';
-
-  const author=item.author_name||'An Unmasker';
-  ctx.font='700 31px Arial, sans-serif';ctx.fillStyle='#fff';
-  ctx.fillText(author+' unmasked',76,292);
-
-  ctx.font='800 49px Arial, sans-serif';
-  const titleLines=canvasWrap(ctx,item.product_name||'a product',900,3);
-  ctx.fillStyle='#fff';
-  titleLines.forEach((line,i)=>ctx.fillText(line,76,365+i*57));
-
-  let product:HTMLImageElement|null=null;
-  try{product=await loadCanvasImage('/api/share-product-image?id='+encodeURIComponent(item.id))}catch{}
-  const imageTop=titleLines.length>1?520:470;
-  const imageBottom=880;
-
-  if(product){
-    const maxW=860,maxH=imageBottom-imageTop;
-    const scale=Math.min(maxW/product.width,maxH/product.height);
-    const w=product.width*scale,h=product.height*scale;
-    const x=(1080-w)/2,y=imageTop+(maxH-h)/2;
-    ctx.save();
-    ctx.shadowColor='rgba(0,0,0,.42)';ctx.shadowBlur=40;ctx.shadowOffsetY=18;
-    ctx.fillStyle='rgba(255,255,255,.06)';
-    ctx.roundRect(70,imageTop-18,940,maxH+36,42);ctx.fill();
-    ctx.drawImage(product,x,y,w,h);
-    ctx.restore();
-  }else{
-    ctx.save();
-    ctx.globalAlpha=.16;
-    if(logo) ctx.drawImage(logo,300,imageTop+25,480,480);
-    ctx.restore();
-    ctx.fillStyle='#F6D7DE';ctx.font='600 28px Arial, sans-serif';
-    ctx.textAlign='center';ctx.fillText('An Unmask community experience',540,imageTop+420);ctx.textAlign='left';
-  }
-
-  ctx.fillStyle='rgba(10,6,8,.84)';
-  ctx.roundRect(54,920,972,290,38);ctx.fill();
-  ctx.strokeStyle='rgba(238,140,124,.42)';ctx.lineWidth=2;ctx.stroke();
-
-  ctx.fillStyle='#F3EBE2';ctx.font='600 29px Arial, sans-serif';
-  const body=item.body||'See what really happened with the product — shared by the Unmask community.';
-  const bodyLines=canvasWrap(ctx,body,860,4);
-  bodyLines.forEach((line,i)=>ctx.fillText(line,92,985+i*39));
-
-  ctx.fillStyle='#EE8C7C';ctx.font='800 27px Arial, sans-serif';
-  ctx.fillText('Know before you buy.',92,1160);
-
-  ctx.fillStyle='rgba(255,255,255,.09)';
-  ctx.roundRect(54,1230,972,74,37);ctx.fill();
-  ctx.fillStyle='#fff';ctx.font='600 24px Arial, sans-serif';
-  ctx.fillText('unmask-launch-network.vercel.app',100,1277);
-  ctx.textAlign='right';ctx.fillText('UNMASK →',982,1277);ctx.textAlign='left';
-
-  const blob=await new Promise<Blob>((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('Could not prepare branded card.')),'image/png',.94));
-  return new File([blob],'unmask-'+String(item.id).slice(0,8)+'.png',{type:'image/png'});
+  const text='🕵️ '+author+' unmasked '+item.product_name+'.\n\nSee what really happened with the product — shared by the Unmask community. Know before you buy.\n\n'+url;
+  return {url,text,title:'Unmasked: '+item.product_name};
 }
 
 async function shareNative(item:any){
   const share=unmaskShare(item);
-  if(navigator.share){
-    try{
-      const file=await createBrandedShareCard(item);
-      if(!navigator.canShare||navigator.canShare({files:[file]})){
-        return await navigator.share({title:share.title,text:share.text,files:[file]});
-      }
-    }catch{}
-    return navigator.share({title:share.title,text:share.text,url:share.url});
-  }
+  if(navigator.share) return navigator.share({title:share.title,text:share.text,url:share.url});
   await navigator.clipboard.writeText(share.text);
 }
 
-async function shareWhatsApp(item:any){
+function shareWhatsApp(item:any){
   const share=unmaskShare(item);
-  if(navigator.share){
-    try{
-      const file=await createBrandedShareCard(item);
-      if(!navigator.canShare||navigator.canShare({files:[file]})){
-        return await navigator.share({title:share.title,text:share.text,files:[file]});
-      }
-    }catch{}
-  }
   window.open('https://wa.me/?text='+encodeURIComponent(share.text),'_blank','noopener,noreferrer');
-}
-
-async function downloadBrandedShare(item:any){
-  const file=await createBrandedShareCard(item);
-  const href=URL.createObjectURL(file);
-  const a=document.createElement('a');
-  a.href=href;a.download=file.name;
-  document.body.appendChild(a);a.click();a.remove();
-  setTimeout(()=>URL.revokeObjectURL(href),1200);
 }
 
 async function copyUnmaskLink(item:any){
@@ -865,9 +726,8 @@ function CommunityFeed({ items=[], onLike, compact=false, publicView=false }:any
         <div className="post-actions">
           <button className={item.liked_by_me?'liked':''} disabled={publicView} onClick={()=>onLike?.(item)}><FA name="heart"/><span>{item.likes||0}</span>{!publicView&&<small>{item.liked_by_me?'Helpful':'That helped'}</small>}</button>
           <button onClick={()=>shareNative(item).catch(()=>undefined)}><FA name="share-nodes"/><small>Share</small></button>
-          <button onClick={()=>shareWhatsApp(item).catch(()=>undefined)}><i className="fa-brands fa-whatsapp"/><small>Status / WhatsApp</small></button>
+          <button onClick={()=>shareWhatsApp(item)}><i className="fa-brands fa-whatsapp"/><small>Status / WhatsApp</small></button>
           <button onClick={()=>copyUnmaskLink(item).catch(()=>undefined)}><FA name="link"/><small>Copy</small></button>
-          <button onClick={()=>downloadBrandedShare(item).catch(()=>undefined)}><FA name="download"/><small>Save branded</small></button>
         </div>
       </article>
     })}
@@ -1375,27 +1235,18 @@ function Unmask({ go }: any) {
           <button className="btn whatsapp-share" onClick={()=>shareWhatsApp({
             id:savedNoteId,
             author_name:summary?.displayName||'An Unmasker',
-            product_name:product?.name||'a product',
-            body:context.body
-          }).catch(()=>undefined)}><i className="fa-brands fa-whatsapp"/> WhatsApp / Status</button>
+            product_name:product?.name||'a product'
+          })}><i className="fa-brands fa-whatsapp"/> WhatsApp / Status</button>
           <button className="btn ghost" onClick={()=>shareNative({
             id:savedNoteId,
             author_name:summary?.displayName||'An Unmasker',
-            product_name:product?.name||'a product',
-            body:context.body
+            product_name:product?.name||'a product'
           }).catch(()=>undefined)}><FA name="share-nodes"/> Share elsewhere</button>
           <button className="btn ghost" onClick={()=>copyUnmaskLink({
             id:savedNoteId,
             author_name:summary?.displayName||'An Unmasker',
-            product_name:product?.name||'a product',
-            body:context.body
+            product_name:product?.name||'a product'
           }).catch(()=>undefined)}><FA name="link"/> Copy</button>
-          <button className="btn ghost" onClick={()=>downloadBrandedShare({
-            id:savedNoteId,
-            author_name:summary?.displayName||'An Unmasker',
-            product_name:product?.name||'a product',
-            body:context.body
-          }).catch(()=>undefined)}><FA name="download"/> Save branded</button>
         </div>
       </div>
 
