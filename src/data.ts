@@ -145,7 +145,13 @@ export async function getCommunityStats() {
 export async function getMyUnmaskerMission() {
   const { data, error } = await supabase.rpc('get_my_unmasker_mission');
   if (error) throw error;
-  return data || { products_unmasked: 0, mission_target: 3, category_voted: false, social_followed: 0 };
+  return data || { mission: null, products_unmasked: 0, mission_target: 0, progress_count: 0, completed: false, category_voted: false, social_followed: 0 };
+}
+
+export async function recordMissionView(missionId: string) {
+  if (!missionId) return;
+  const { error } = await supabase.rpc('record_mission_view', { p_mission_id: missionId });
+  if (error) throw error;
 }
 
 export async function toggleUnmaskLike(noteId: string) {
