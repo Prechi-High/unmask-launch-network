@@ -398,3 +398,28 @@
 .unmasker-hero:after{
   display:none;
 }
+
+/* Dashboard hero — fully remove the dark hero treatment */
+.unmasker-hero{
+  background:#fff7f4!important;
+  color:#241b1e!important;
+  border:1px solid #eadbd7;
+  box-shadow:0 14px 34px #701a2e0d!important;
+}
+.unmasker-hero:after{display:none!important}
+.unmasker-hero .eyebrow{color:var(--wine)!important}
+.unmasker-hero h1{color:#241b1e!important}
+.unmasker-hero h1 em{color:var(--wine)!important}
+.unmasker-hero p{color:#62585c!important}
+.hero-unmask-btn{
+  background:var(--wine)!important;
+  color:#fff!important;
+  border-color:var(--wine)!important;
+}
+.today-live{
+  background:#fff!important;
+  border:1px solid #eadbd7!important;
+  color:#2d2326!important;
+  box-shadow:0 8px 22px #701a2e0b;
+}
+.today-live small{color:#756a6e!important}
