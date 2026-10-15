@@ -355,3 +355,24 @@
   .mission-editor-form label.wide,.mission-active{grid-column:1}
   .mission-history-metrics{grid-template-columns:1fr 1fr}
 }
+
+.detail-delete-btn{
+  width:100%;
+  margin-top:12px;
+  border:1px solid #f1c7cf;
+  background:#fff3f5;
+  color:#b31331;
+  border-radius:9px;
+  padding:10px 12px;
+  font-size:9px;
+  font-weight:850;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+}
+.detail-delete-btn:hover{
+  background:#b31331;
+  border-color:#b31331;
+  color:#fff;
+}
