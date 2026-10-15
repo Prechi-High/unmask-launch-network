@@ -58,6 +58,12 @@ export async function updateExperienceStatus(id:string,status:string){
   if(error) throw error;
 }
 
+export async function deleteExperience(id:string){
+  const { data, error } = await supabase.rpc('admin_delete_experience',{p_id:id});
+  if(error) throw error;
+  return Boolean(data);
+}
+
 export async function updateCollaborationStatus(id:string,status:string){
   const { error } = await supabase.rpc('admin_update_collaboration_status',{p_id:id,p_status:status});
   if(error) throw error;
