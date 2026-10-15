@@ -106,3 +106,34 @@ export async function startNewBuildRound(title:string,votingEndsAt:string){
   if(error) throw error;
   return data;
 }
+
+
+export async function getAdminMissionDashboard(){
+  const { data, error } = await supabase.rpc('admin_get_mission_dashboard');
+  if(error) throw error;
+  return data || { missions: [] };
+}
+
+export async function saveMission(input:{
+  id?:string|null;
+  sectionTitle:string;
+  heading:string;
+  subtext:string;
+  targetCount:number;
+  startsAt?:string|null;
+  endsAt?:string|null;
+  active:boolean;
+}){
+  const { data, error } = await supabase.rpc('admin_save_mission',{
+    p_id:input.id||null,
+    p_section_title:input.sectionTitle,
+    p_heading:input.heading,
+    p_subtext:input.subtext,
+    p_target_count:input.targetCount,
+    p_starts_at:input.startsAt?new Date(input.startsAt).toISOString():null,
+    p_ends_at:input.endsAt?new Date(input.endsAt).toISOString():null,
+    p_active:input.active
+  });
+  if(error) throw error;
+  return data;
+}
