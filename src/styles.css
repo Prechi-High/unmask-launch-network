@@ -695,3 +695,57 @@
   backdrop-filter:none!important;
   -webkit-backdrop-filter:none!important;
 }
+
+/* Dynamic mission progress */
+.mission-track.dynamic-target{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(44px,1fr));
+  gap:9px;
+}
+.mission-track.dynamic-target span{
+  min-width:44px;
+}
+
+/* Stay close to the movement — remove dark image overlays completely. */
+.social-follow-card{
+  color:#241b1e!important;
+  align-items:stretch;
+  padding:12px;
+  background-color:#f8f3f1;
+  background-repeat:no-repeat;
+  background-size:cover;
+  background-position:center;
+  position:relative;
+}
+.social-follow-card:before,
+.social-follow-card:after,
+.social-follow-card.x-follow-banner:before{
+  display:none!important;
+  content:none!important;
+  background:none!important;
+}
+.social-follow-card>div{
+  align-self:flex-end;
+  max-width:72%;
+  background:rgba(255,255,255,.94);
+  border:1px solid rgba(255,255,255,.95);
+  border-radius:13px;
+  padding:10px;
+  box-shadow:0 7px 18px #2a080f12;
+  color:#241b1e;
+}
+.social-follow-card>div>span{color:var(--wine)}
+.social-follow-card small{color:#746b6e!important}
+.social-follow-card>strong{
+  align-self:flex-start;
+  margin-left:auto;
+  background:#fff1b9;
+  box-shadow:0 4px 13px #2a080f10;
+}
+.social-follow-card.x-follow-banner{
+  background-size:cover!important;
+  background-position:center!important;
+}
+@media(max-width:700px){
+  .social-follow-card>div{max-width:78%}
+}
