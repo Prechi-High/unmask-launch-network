@@ -1156,6 +1156,7 @@ function Unmask({ go }: any) {
         productName:product?.name,
         brand:product?.brand,
         category:product?.category,
+        productImage:product?.image||product?.product_image||'',
         ownershipStatus:ownership,
         usedDuration:context.duration,
         usageFrequency:context.frequency,
