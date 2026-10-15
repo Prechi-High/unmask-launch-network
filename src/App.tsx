@@ -22,7 +22,9 @@ import {
   submitExperience,
   suggestProduct,
   toggleUnmaskLike,
-  verifyOwnership
+  verifyOwnership,
+  uploadProfileAvatar,
+  logout
 } from './data';
 import { supabase } from './supabase';
 import AdminConsole from './Admin';
@@ -343,6 +345,61 @@ function CoinPeek({ amount=0 }:any){
   </div>;
 }
 
+function ProfileMenu({ summary, go }:any){
+  const [open,setOpen]=useState(false);
+  const [avatarUrl,setAvatarUrl]=useState(summary?.avatarUrl||'');
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState('');
+  const inputId='profile-avatar-upload';
+
+  useEffect(()=>setAvatarUrl(summary?.avatarUrl||''),[summary?.avatarUrl]);
+
+  const upload=async(e:any)=>{
+    const file=e.target.files?.[0];
+    if(!file)return;
+    setBusy(true);setError('');
+    try{
+      const url=await uploadProfileAvatar(file);
+      setAvatarUrl(url);
+    }catch(err:any){setError(err.message||'Could not update your profile image.')}
+    finally{
+      setBusy(false);
+      e.target.value='';
+    }
+  };
+
+  const signOut=async()=>{
+    setBusy(true);setError('');
+    try{
+      await logout();
+      localStorage.setItem('unmask_view','landing');
+      setOpen(false);
+      go('landing');
+    }catch(err:any){setError(err.message||'Could not log out.')}
+    finally{setBusy(false)}
+  };
+
+  const initial=summary?.displayName?.[0]?.toUpperCase()||'U';
+
+  return <div className="profile-menu-wrap">
+    <button className={'avatar profile-avatar '+(avatarUrl?'has-image':'')} onClick={()=>setOpen(v=>!v)} aria-label="Open profile menu">
+      {avatarUrl?<img src={avatarUrl} alt={summary?.displayName||'Profile'}/>:initial}
+    </button>
+    {open&&<div className="profile-dropdown">
+      <div className="profile-dropdown-head">
+        <span className={'profile-dropdown-avatar '+(avatarUrl?'has-image':'')}>{avatarUrl?<img src={avatarUrl} alt=""/>:initial}</span>
+        <div><b>{summary?.displayName||'Unmasker'}</b><small>{summary?.email||''}</small></div>
+      </div>
+      <label className="profile-menu-action" htmlFor={inputId}>
+        <FA name="camera"/><span>{avatarUrl?'Change profile image':'Add profile image'}</span>
+      </label>
+      <input id={inputId} className="profile-file-input" type="file" accept="image/jpeg,image/png,image/webp" onChange={upload}/>
+      <button className="profile-menu-action logout" disabled={busy} onClick={signOut}><FA name="arrow-right-from-bracket"/><span>{busy?'Please wait…':'Log out'}</span></button>
+      {error&&<small className="profile-menu-error">{error}</small>}
+    </div>}
+  </div>;
+}
+
 function Shell({ children, go, active, summary }: any) {
   const nav = [
     ['dashboard','Home','house'],
@@ -356,7 +413,7 @@ function Shell({ children, go, active, summary }: any) {
         {summary?.isAdmin&&<button className="admin-entry" onClick={()=>go('admin')} title="Open Admin"><FA name="shield-halved"/></button>}
         <CoinPeek amount={summary?.coins||0}/>
         <NotificationCenter userId={summary?.userId} go={go}/>
-        <span className="avatar">{summary?.displayName?.[0]?.toUpperCase() || 'U'}</span>
+        <ProfileMenu summary={summary} go={go}/>
       </div>
     </header>
     <div className="app-body">{children}</div>
@@ -706,10 +763,16 @@ function CommunityFeed({ items=[], onLike, compact=false, publicView=false }:any
       const initial=(item.author_name||'U').trim().charAt(0).toUpperCase();
       return <article className="unmask-post" key={item.id}>
         <div className="post-top">
-          <span className="post-avatar">{initial}</span>
+          <span className={'post-avatar '+(item.author_avatar_url?'has-image':'')}>
+            {item.author_avatar_url?<img src={item.author_avatar_url} alt={item.author_name||'Unmasker'}/>:initial}
+          </span>
           <div className="post-person"><b>{item.author_name||'An Unmasker'}</b><span>unmasked <strong>{item.product_name}</strong></span></div>
           <span className="post-time">{new Date(item.created_at).toLocaleDateString(undefined,{month:'short',day:'numeric'})}</span>
         </div>
+
+        {item.product_image&&<button className="post-product-image" onClick={()=>setOpen(expanded?null:item.id)} aria-label={'View '+item.product_name+' experience'}>
+          <img src={item.product_image} alt={item.product_name||'Product unmasked'} loading="lazy"/>
+        </button>}
 
         <button className="post-story" onClick={()=>setOpen(expanded?null:item.id)}>
           <div className="post-product-line"><span>UNMASKED</span><b>{item.product_name}</b>{item.brand&&<small>{item.brand}</small>}</div>
