@@ -60,21 +60,63 @@ async function enableBrowserPush(){
 }
 
 function unmaskShare(item:any){
-  const url=window.location.origin+'/?post='+encodeURIComponent(item.id);
+  const id=encodeURIComponent(item.id);
+  const url=window.location.origin+'/api/share?id='+id;
+  const imageUrl=window.location.origin+'/api/share-image?id='+id;
   const author=item.author_name||'An Unmasker';
-  const text='🕵️ '+author+' unmasked '+item.product_name+'.\n\nSee what really happened with the product — shared by the Unmask community. Know before you buy.\n\n'+url;
-  return {url,text,title:'Unmasked: '+item.product_name};
+  const product=item.product_name||'a product';
+  const text='🕵️ '+author+' unmasked '+product+'.\n\nSee what really happened with the product — shared by the Unmask community. Know before you buy.\n\n'+url;
+  return {url,imageUrl,text,title:'Unmasked: '+product};
+}
+
+async function brandedShareFile(item:any){
+  const share=unmaskShare(item);
+  const response=await fetch(share.imageUrl);
+  if(!response.ok) throw new Error('Could not prepare the branded share card.');
+  const blob=await response.blob();
+  return new File([blob],'unmask-'+String(item.id).slice(0,8)+'.png',{type:'image/png'});
 }
 
 async function shareNative(item:any){
   const share=unmaskShare(item);
-  if(navigator.share) return navigator.share({title:share.title,text:share.text,url:share.url});
+  if(navigator.share){
+    try{
+      const file=await brandedShareFile(item);
+      if(!navigator.canShare || navigator.canShare({files:[file]})){
+        return await navigator.share({title:share.title,text:share.text,files:[file]});
+      }
+    }catch{}
+    return navigator.share({title:share.title,text:share.text,url:share.url});
+  }
   await navigator.clipboard.writeText(share.text);
 }
 
-function shareWhatsApp(item:any){
+async function shareWhatsApp(item:any){
   const share=unmaskShare(item);
+  if(navigator.share){
+    try{
+      const file=await brandedShareFile(item);
+      if(!navigator.canShare || navigator.canShare({files:[file]})){
+        return await navigator.share({title:share.title,text:share.text,files:[file]});
+      }
+    }catch{}
+  }
   window.open('https://wa.me/?text='+encodeURIComponent(share.text),'_blank','noopener,noreferrer');
+}
+
+async function downloadBrandedShare(item:any){
+  const share=unmaskShare(item);
+  const response=await fetch(share.imageUrl);
+  if(!response.ok) throw new Error('Could not prepare the branded card.');
+  const blob=await response.blob();
+  const href=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=href;
+  a.download='unmask-'+String(item.id).slice(0,8)+'.png';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(href),1000);
 }
 
 async function copyUnmaskLink(item:any){
@@ -726,8 +768,9 @@ function CommunityFeed({ items=[], onLike, compact=false, publicView=false }:any
         <div className="post-actions">
           <button className={item.liked_by_me?'liked':''} disabled={publicView} onClick={()=>onLike?.(item)}><FA name="heart"/><span>{item.likes||0}</span>{!publicView&&<small>{item.liked_by_me?'Helpful':'That helped'}</small>}</button>
           <button onClick={()=>shareNative(item).catch(()=>undefined)}><FA name="share-nodes"/><small>Share</small></button>
-          <button onClick={()=>shareWhatsApp(item)}><i className="fa-brands fa-whatsapp"/><small>Status / WhatsApp</small></button>
+          <button onClick={()=>shareWhatsApp(item).catch(()=>undefined)}><i className="fa-brands fa-whatsapp"/><small>Status / WhatsApp</small></button>
           <button onClick={()=>copyUnmaskLink(item).catch(()=>undefined)}><FA name="link"/><small>Copy</small></button>
+          <button onClick={()=>downloadBrandedShare(item).catch(()=>undefined)}><FA name="download"/><small>Save card</small></button>
         </div>
       </article>
     })}
@@ -1236,7 +1279,7 @@ function Unmask({ go }: any) {
             id:savedNoteId,
             author_name:summary?.displayName||'An Unmasker',
             product_name:product?.name||'a product'
-          })}><i className="fa-brands fa-whatsapp"/> WhatsApp / Status</button>
+          }).catch(()=>undefined)}><i className="fa-brands fa-whatsapp"/> WhatsApp / Status</button>
           <button className="btn ghost" onClick={()=>shareNative({
             id:savedNoteId,
             author_name:summary?.displayName||'An Unmasker',
@@ -1247,6 +1290,11 @@ function Unmask({ go }: any) {
             author_name:summary?.displayName||'An Unmasker',
             product_name:product?.name||'a product'
           }).catch(()=>undefined)}><FA name="link"/> Copy</button>
+          <button className="btn ghost" onClick={()=>downloadBrandedShare({
+            id:savedNoteId,
+            author_name:summary?.displayName||'An Unmasker',
+            product_name:product?.name||'a product'
+          }).catch(()=>undefined)}><FA name="download"/> Save branded card</button>
         </div>
       </div>
 
