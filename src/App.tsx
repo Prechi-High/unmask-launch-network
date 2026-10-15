@@ -804,7 +804,7 @@ function Dashboard({ go }: any) {
 
   const inviteShare=async(mode:'native'|'whatsapp'|'copy'='native')=>{
     if(!summary?.referralCode)return;
-    const link=window.location.origin+'?ref='+summary.referralCode;
+    const link=window.location.origin+'/api/invite?ref='+encodeURIComponent(summary.referralCode);
     const text='We’re building Unmask together — a community that reveals what products are really like before people buy. Join as an Unmasker and unmask something you’ve used.\n\n'+link;
     try{
       if(mode==='whatsapp') return window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank','noopener,noreferrer');
