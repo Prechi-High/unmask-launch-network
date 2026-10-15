@@ -760,6 +760,7 @@ function Dashboard({ go }: any) {
       .on('postgres_changes',{event:'*',schema:'public',table:'ownership_notes'},()=>refresh())
       .on('postgres_changes',{event:'*',schema:'public',table:'unmask_post_likes'},()=>getCommunityFeed(5).then(setFeed).catch(()=>undefined))
       .on('postgres_changes',{event:'*',schema:'public',table:'launch_category_votes'},()=>refresh())
+      .on('postgres_changes',{event:'*',schema:'public',table:'mission_campaigns'},()=>refresh())
       .subscribe();
     return()=>{supabase.removeChannel(channel)};
   },[]);
