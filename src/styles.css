@@ -749,3 +749,13 @@
 @media(max-width:700px){
   .social-follow-card>div{max-width:78%}
 }
+
+/* Outbound Unmask branding */
+.post-actions{flex-wrap:wrap}
+.post-actions button{white-space:nowrap}
+.share-after-actions{align-items:stretch}
+.share-after-actions .btn{min-height:42px}
+@media(max-width:700px){
+  .post-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .post-actions button{justify-content:center}
+}
