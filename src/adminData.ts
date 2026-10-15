@@ -82,3 +82,27 @@ export async function sendNotificationToUsers(userIds:string[],title:string,body
   if(error) throw error;
   return Number(data||0);
 }
+
+
+export async function getAdminBuildCategories(){
+  const { data, error } = await supabase.rpc('admin_get_build_categories');
+  if(error) throw error;
+  return Array.isArray(data)?data:[];
+}
+
+export async function setCategoryTestingUrl(categoryId:string,testingUrl:string){
+  const { error } = await supabase.rpc('admin_set_category_testing_url',{
+    p_category_id:categoryId,
+    p_testing_url:testingUrl
+  });
+  if(error) throw error;
+}
+
+export async function startNewBuildRound(title:string,votingEndsAt:string){
+  const { data, error } = await supabase.rpc('admin_start_new_build_round',{
+    p_title:title,
+    p_voting_ends_at:new Date(votingEndsAt).toISOString()
+  });
+  if(error) throw error;
+  return data;
+}
