@@ -10,6 +10,7 @@ import {
   getCommunityFeed,
   getCommunityStats,
   getMyUnmaskerMission,
+  recordMissionView,
   getBuildVisionState,
   getNotifications,
   getPushSubscriptionStatus,
@@ -736,7 +737,7 @@ function CommunityFeed({ items=[], onLike, compact=false, publicView=false }:any
 function Dashboard({ go }: any) {
   const [summary,setSummary]=useState<any>(null);
   const [stats,setStats]=useState<any>({unmasked_today:0,unmasked_total:0,unmaskers_total:0,active_unmaskers_today:0,category_votes:0});
-  const [mission,setMission]=useState<any>({products_unmasked:0,mission_target:3,category_voted:false,social_followed:0});
+  const [mission,setMission]=useState<any>({mission:null,products_unmasked:0,mission_target:0,progress_count:0,completed:false,category_voted:false,social_followed:0});
   const [feed,setFeed]=useState<any[]>([]);
   const [trends,setTrends]=useState<any>({categories:[],products:[],total_votes:0,total_suggestions:0});
   const [categories,setCategories]=useState<any[]>([]);
@@ -762,6 +763,11 @@ function Dashboard({ go }: any) {
       .subscribe();
     return()=>{supabase.removeChannel(channel)};
   },[]);
+
+  useEffect(()=>{
+    const missionId=mission?.mission?.id;
+    if(missionId) recordMissionView(missionId).catch(()=>undefined);
+  },[mission?.mission?.id]);
 
   const like=async(item:any)=>{
     try{
@@ -807,8 +813,9 @@ function Dashboard({ go }: any) {
     }catch{}
   };
 
-  const missionDone=Math.min(Number(mission.products_unmasked||0),Number(mission.mission_target||3));
-  const missionTarget=Number(mission.mission_target||3);
+  const missionTarget=Number(mission?.mission?.target_count||mission.mission_target||0);
+  const missionDone=Math.min(Number(mission.progress_count??mission.products_unmasked??0),missionTarget);
+  const activeMission=mission?.mission||null;
   const socialTasks=summary?.tasks?.filter((t:any)=>t.key==='follow_x'||t.key==='follow_tiktok')||[];
 
   return <Shell go={go} active="dashboard" summary={summary}>
@@ -825,16 +832,16 @@ function Dashboard({ go }: any) {
       </div>
     </section>
 
-    <section className="first-mission">
+    {activeMission&&<section className="first-mission">
       <div className="mission-head">
-        <div><span className="eyebrow">YOUR FIRST MISSION</span><h2>Unmask 3 products you know.</h2><p>Look around your home. Pick products you have actually used and leave the truth behind for the next buyer.</p></div>
+        <div><span className="eyebrow">{activeMission.section_title}</span><h2>{activeMission.heading}</h2><p>{activeMission.subtext}</p></div>
         <strong>{missionDone}/{missionTarget}</strong>
       </div>
-      <div className="mission-track">{Array.from({length:missionTarget}).map((_,i)=><span key={i} className={i<missionDone?'done':''}>{i<missionDone?<FA name="check"/>:i+1}</span>)}</div>
+      <div className="mission-track dynamic-target">{Array.from({length:missionTarget}).map((_,i)=><span key={i} className={i<missionDone?'done':''}>{i<missionDone?<FA name="check"/>:i+1}</span>)}</div>
       <div className="mission-actions">
-        <button className="btn solid" onClick={()=>go('unmask')}>{missionDone>=missionTarget?'Unmask another one':'Continue the mission'} <FA name="arrow-right"/></button>
+        <button className="btn solid" onClick={()=>go('unmask')}>{missionDone>=missionTarget?'Mission complete — unmask another':'Continue the mission'} <FA name="arrow-right"/></button>
       </div>
-    </section>
+    </section>}
 
     <section className="invite-unmasker-card">
       <div className="invite-unmasker-mark"><FA name="people-group"/></div>
@@ -873,7 +880,7 @@ function Dashboard({ go }: any) {
     <section className="social-only-rewards">
       <div className="section-head compact"><div><span className="eyebrow">STAY CLOSE TO THE MOVEMENT</span><h2>Follow Unmask.</h2></div><small>Get updates as the community and build move forward.</small></div>
       <div className="social-follow-grid">
-        {socialTasks.map((task:any)=><button key={task.key} className={'social-follow-card '+(task.key==='follow_x'?'x-follow-banner ':'')+(task.completed?'done':'')} style={{backgroundImage:'linear-gradient(90deg,rgba(25,4,10,.88),rgba(25,4,10,.42)),url("'+TASK_IMAGES[task.key]+'")'}} onClick={()=>task.completed?undefined:social(task)}>
+        {socialTasks.map((task:any)=><button key={task.key} className={'social-follow-card '+(task.key==='follow_x'?'x-follow-banner ':'')+(task.completed?'done':'')} style={{backgroundImage:'url("'+TASK_IMAGES[task.key]+'")'}} onClick={()=>task.completed?undefined:social(task)}>
           <div><span><i className={'fa-brands fa-'+(task.key==='follow_x'?'x-twitter':'tiktok')}/></span><b>{task.key==='follow_x'?'Follow Unmask on X':'Follow Unmask on TikTok'}</b><small>{task.completed?'Completed':clickedTask===task.key?'Tap again after following':'Stay with the movement'}</small></div>
           <strong>{task.completed?<><FA name="check"/> Done</>:<><FA name="coins"/> +{task.coin_amount||100}</>}</strong>
         </button>)}
