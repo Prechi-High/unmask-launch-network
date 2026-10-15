@@ -73,7 +73,7 @@ export default async function handler(req:any,res:any){
     const origin=proto+'://'+host;
 
     const [logo,product]=await Promise.all([
-      toDataUrl('/resources/unmask-logo.png',origin),
+      toDataUrl('/resources/unmask-favicon.png',origin),
       toDataUrl(note.product_image||'',origin)
     ]);
 
@@ -116,7 +116,9 @@ export default async function handler(req:any,res:any){
 
       <rect x="50" y="48" width="980" height="1254" rx="52" fill="none" stroke="#ED6F8B" stroke-opacity=".32" stroke-width="2"/>
 
-      ${logo?'<image href="'+logo+'" x="72" y="70" width="420" height="135" preserveAspectRatio="xMinYMid meet"/>':''}
+      ${logo?'<image href="'+logo+'" x="72" y="72" width="118" height="118" preserveAspectRatio="xMidYMid meet"/>':''}
+      <text x="216" y="135" font-size="66" font-family="Arial,Helvetica,sans-serif" fill="#FFFFFF" font-weight="800">Unmask</text>
+      <text x="218" y="172" font-size="24" font-family="Arial,Helvetica,sans-serif" fill="#EADDE1">Know before you buy.</text>
 
       <text x="78" y="246" font-size="19" letter-spacing="6" font-family="Arial,Helvetica,sans-serif" fill="#F7B2C2" font-weight="700">SHARED FROM THE UNMASK COMMUNITY</text>
       <text x="78" y="304" font-size="31" font-family="Arial,Helvetica,sans-serif" fill="#FFFFFF" font-weight="700">${esc(author)} <tspan fill="#F18BA2">unmasked</tspan></text>
