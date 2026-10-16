@@ -917,6 +917,8 @@ function Dashboard({ go }: any) {
       </div>
     </section>
 
+    <BuildRoadmap buildState={buildState} currentVote={summary?.voteName} onVote={()=>setShowCategoryPicker(true)}/>
+
     <section className="community-now">
       <div className="section-head compact">
         <div><div className="live-label"><span className="live-dot"/><b>THE COMMUNITY IS UNMASKING</b></div><h2>What Unmaskers are revealing right now.</h2></div>
@@ -925,8 +927,6 @@ function Dashboard({ go }: any) {
       <CommunityFeed items={feed} onLike={like}/>
       <div className="community-view-more"><button className="btn ghost" onClick={()=>go('trends')}>View more unmaskings <FA name="arrow-right"/></button></div>
     </section>
-
-    <BuildRoadmap buildState={buildState} currentVote={summary?.voteName} onVote={()=>setShowCategoryPicker(true)}/>
 
     <section className="simple-next">
       <button onClick={()=>go('suggest')}>
