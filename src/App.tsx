@@ -770,8 +770,8 @@ function CommunityFeed({ items=[], onLike, compact=false, publicView=false }:any
           <span className="post-time">{new Date(item.created_at).toLocaleDateString(undefined,{month:'short',day:'numeric'})}</span>
         </div>
 
-        {item.product_image&&<button className="post-product-image" onClick={()=>setOpen(expanded?null:item.id)} aria-label={'View '+item.product_name+' experience'}>
-          <img src={item.product_image} alt={item.product_name||'Product unmasked'} loading="lazy"/>
+        {item.has_unmask_photo&&<button className="post-product-image" onClick={()=>setOpen(expanded?null:item.id)} aria-label={'View '+item.product_name+' experience'}>
+          <img src={'/api/unmask-photo?id='+encodeURIComponent(item.id)} alt={item.product_name||'Product unmasked'} loading="lazy"/>
         </button>}
 
         <button className="post-story" onClick={()=>setOpen(expanded?null:item.id)}>
