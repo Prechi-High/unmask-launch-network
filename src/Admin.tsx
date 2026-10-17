@@ -18,7 +18,9 @@ import {
   setCategoryTestingUrl,
   startNewBuildRound,
   getAdminMissionDashboard,
-  saveMission
+  saveMission,
+  getAdminTesterProgram,
+  saveAdminTesterProgram
 } from './adminData';
 import './admin.css';
 
@@ -408,6 +410,7 @@ function SettingsPage({overview,onSaved,setNotice}:any){
   const [categories,setCategories]=useState<any[]>([]);
   const [users,setUsers]=useState<any[]>([]);
   const [testingUrl,setTestingUrl]=useState('');
+  const [testerProgram,setTesterProgram]=useState<any>({groupUrl:'',verificationCode:'',coinAmount:150,firstTestAt:'',active:true});
   const [nextRound,setNextRound]=useState({title:'Next Unmask category',ends:''});
   const [phase,setPhase]=useState(overview.build_round?.phase||'voting');
   const [ends,setEnds]=useState(overview.build_round?.voting_ends_at?new Date(overview.build_round.voting_ends_at).toISOString().slice(0,16):'');
@@ -419,11 +422,18 @@ function SettingsPage({overview,onSaved,setNotice}:any){
   const [busy,setBusy]=useState('');
 
   useEffect(()=>{
-    Promise.all([getAdminSection('rewards'),getAdminBuildCategories(),getAdminSection('users',500)])
-      .then(([r,c,u])=>{
+    Promise.all([getAdminSection('rewards'),getAdminBuildCategories(),getAdminSection('users',500),getAdminTesterProgram()])
+      .then(([r,c,u,tp])=>{
         setRewards(r.rules||[]);
         setCategories(c||[]);
         setUsers(Array.isArray(u)?u:[]);
+        setTesterProgram({
+          groupUrl:tp?.group_url||'',
+          verificationCode:tp?.verification_code||'',
+          coinAmount:Number(tp?.coin_amount||150),
+          firstTestAt:tp?.first_test_at?new Date(tp.first_test_at).toISOString().slice(0,16):'',
+          active:tp?.active!==false
+        });
         const active=(c||[]).find((x:any)=>x.id===overview.build_round?.selected_category_id);
         setTestingUrl(active?.testing_url||'');
       });
@@ -449,6 +459,21 @@ function SettingsPage({overview,onSaved,setNotice}:any){
       await updateBuildRound(phase,ends?new Date(ends).toISOString():null,selectedCategory||null);
       if(selectedCategory) await setCategoryTestingUrl(selectedCategory,testingUrl);
       setNotice('Build round updated.');
+      onSaved();
+    }finally{setBusy('')}
+  };
+
+  const saveTesterProgram=async()=>{
+    setBusy('tester-program');
+    try{
+      await saveAdminTesterProgram({
+        groupUrl:testerProgram.groupUrl,
+        verificationCode:testerProgram.verificationCode,
+        coinAmount:Number(testerProgram.coinAmount||0),
+        firstTestAt:testerProgram.firstTestAt||null,
+        active:Boolean(testerProgram.active)
+      });
+      setNotice('Founding Tester settings saved.');
       onSaved();
     }finally{setBusy('')}
   };
@@ -505,10 +530,10 @@ function SettingsPage({overview,onSaved,setNotice}:any){
     <section className="admin-card settings-block"><CardHead icon="coins" title="Social Coin Rewards" sub="Control what following Unmask on social platforms earns."/><div className="settings-rows">{rewards.filter((r:any)=>['follow_x','follow_tiktok'].includes(r.key)).map((r:any)=><div key={r.key}><div><b>{r.title||r.key}</b><small>{r.description}</small></div><input type="number" min="0" value={r.coin_amount} onChange={e=>setRewards(xs=>xs.map((x:any)=>x.key===r.key?{...x,coin_amount:e.target.value}:x))}/><label className="toggle"><input type="checkbox" checked={r.active} onChange={e=>setRewards(xs=>xs.map((x:any)=>x.key===r.key?{...x,active:e.target.checked}:x))}/><span/></label></div>)}</div><button className="settings-save" disabled={busy==='rewards'} onClick={saveRewards}>{busy==='rewards'?'Saving…':'Save reward settings'}</button></section>
 
     <section className="admin-card settings-block">
-      <CardHead icon="hammer" title="Build Round & Category Voting" sub="Control the category currently moving through Vote → Selected → Building → Testing → Live."/>
+      <CardHead icon="hammer" title="Category Build Control" sub="Control the category currently moving through Building → First Test → Improve → V1 Live."/>
       <div className="settings-form-grid">
         <label>Current phase<select value={phase} onChange={e=>setPhase(e.target.value)}><option value="voting">Voting</option><option value="selecting">Selected</option><option value="building">Building</option><option value="testing">Testing</option><option value="live">Live</option></select></label>
-        <label>Voting ends<input type="datetime-local" value={ends} onChange={e=>setEnds(e.target.value)}/></label>
+        <label>Legacy voting deadline<input type="datetime-local" value={ends} onChange={e=>setEnds(e.target.value)}/><small>Kept for later category races; the founding Skincare build is already underway.</small></label>
         <label>Selected category<select value={selectedCategory} onChange={e=>{const id=e.target.value;setSelectedCategory(id);setTestingUrl(categories.find((c:any)=>c.id===id)?.testing_url||'')}}><option value="">No category selected</option>{categories.map((c:any)=><option value={c.id} key={c.id}>{c.name}</option>)}</select></label>
         <label className="settings-wide">Testing link<input type="url" placeholder="https://..." value={testingUrl} onChange={e=>setTestingUrl(e.target.value)}/><small>Shown to Unmaskers only when this category reaches Testing.</small></label>
       </div>
@@ -568,4 +593,16 @@ function AdminTable({headers,children}:{headers:string[],children:any}){
   return <div className="admin-table-scroll"><table className="admin-table"><thead><tr>{headers.map(h=><th key={h}>{h}</th>)}</tr></thead><tbody>{children}</tbody></table></div>
 }
 function DetailTitle({icon,title}:{icon:string,title:string}){return <div className="detail-title"><span><FA name={icon}/></span><h3>{title}</h3></div>}
-function Info({label,value}:{label:string,value:any}){return <div className="detail-info"><span>{label}</span><b>{value??'—'}</b></div>}
+function Info({label,value}:{label:string,value:any}){return <div className="detail-info"><span>{label}</span><b>{value??'—'}</b></div>}    <section className="admin-card settings-block tester-admin-block">
+      <CardHead icon="flask" title="Founding Tester Group" sub="Configure the WhatsApp tester group, first-test countdown and tester Coin reward."/>
+      <div className="settings-form-grid">
+        <label className="settings-wide">WhatsApp group invite link<input type="url" placeholder="https://chat.whatsapp.com/..." value={testerProgram.groupUrl} onChange={e=>setTesterProgram({...testerProgram,groupUrl:e.target.value})}/><small>Users see the Join button only after this link is added.</small></label>
+        <label>Tester verification code<input type="text" placeholder="e.g. SKINCARE8" value={testerProgram.verificationCode} onChange={e=>setTesterProgram({...testerProgram,verificationCode:e.target.value})}/><small>Post this code inside the WhatsApp group. Members enter it on Unmask to verify they joined.</small></label>
+        <label>Join reward (Coins)<input type="number" min="0" value={testerProgram.coinAmount} onChange={e=>setTesterProgram({...testerProgram,coinAmount:e.target.value})}/></label>
+        <label>First tester build<input type="datetime-local" value={testerProgram.firstTestAt} onChange={e=>setTesterProgram({...testerProgram,firstTestAt:e.target.value})}/></label>
+        <label className="toggle-row"><span>Tester program active</span><span className="toggle"><input type="checkbox" checked={testerProgram.active} onChange={e=>setTesterProgram({...testerProgram,active:e.target.checked})}/><span/></span></label>
+      </div>
+      <button className="settings-save" disabled={busy==='tester-program'} onClick={saveTesterProgram}>{busy==='tester-program'?'Saving…':'Save tester settings'}</button>
+    </section>
+
+
