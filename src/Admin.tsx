@@ -12,6 +12,8 @@ import {
   updateExperienceStatus,
   deleteExperience,
   updateRequestStatus,
+  deleteProductRequest,
+  updateProductRequestCategory,
   updateRewardRule,
   sendNotificationToUsers,
   getAdminBuildCategories,
@@ -203,6 +205,21 @@ function TableLayout({children,detail}:{children:any,detail?:any}){
 
 function RequestsPage({rows,stats,selected,setSelected,onChanged}:any){
   const change=async(id:string,status:string)=>{await updateRequestStatus(id,status);onChanged()};
+  const categories=['Skincare','Tech','Fashion','Food & Drink','Home Appliances','Gaming','Automotive','Other'];
+  const recategorize=async(category:string)=>{
+    if(!selected)return;
+    await updateProductRequestCategory(selected.id,category);
+    setSelected({...selected,category_label:category});
+    onChanged();
+  };
+  const remove=async()=>{
+    if(!selected)return;
+    const ok=window.confirm('Delete this requested product permanently? This cannot be undone.');
+    if(!ok)return;
+    await deleteProductRequest(selected.id);
+    setSelected(null);
+    onChanged();
+  };
   return <>
     <div className="admin-stats four">
       <Stat icon="file-lines" label="Total Requests" value={stats.total||0}/>
@@ -210,8 +227,8 @@ function RequestsPage({rows,stats,selected,setSelected,onChanged}:any){
       <Stat icon="flask" label="In Research" value={stats.research||0}/>
       <Stat icon="users" label="Assigned / Scheduled" value={stats.assigned_scheduled||0}/>
     </div>
-    <TableLayout detail={selected&&<><DetailTitle icon="file-lines" title="Request Detail"/><h3>{selected.product_name}</h3><p>{selected.brand||'No brand'} · {selected.category_label||'Uncategorised'}</p><Info label="Requested by" value={selected.requester_name||'Unmasker'}/><Info label="Status" value={selected.status}/><Info label="Submitted" value={fmtDate(selected.created_at)}/><h4>What they want to know</h4><p>{selected.notes||'No extra note was provided.'}</p><div className="detail-actions"><button onClick={()=>change(selected.id,'researching')}>Start research</button><button onClick={()=>change(selected.id,'scheduled')}>Mark scheduled</button><button onClick={()=>change(selected.id,'completed')}>Complete</button></div></>}>
-      <CardHead icon="file-lines" title="All Product Requests" sub="Review and manage product requests from the Unmask community."/>
+    <TableLayout detail={selected&&<><DetailTitle icon="file-lines" title="Request Detail"/><h3>{selected.product_name}</h3><p>{selected.brand||'No brand'} · {selected.category_label||'Uncategorised'}</p><Info label="Requested by" value={selected.requester_name||'Unmasker'}/><Info label="Status" value={selected.status}/><Info label="Submitted" value={fmtDate(selected.created_at)}/><h4>Product category</h4><select value={selected.category_label||''} onChange={e=>recategorize(e.target.value)}><option value="">Uncategorised</option>{categories.map(c=><option key={c} value={c}>{c}</option>)}</select><small>Only products categorised as Skincare appear in the current Skincare build pulse.</small><h4>What they want to know</h4><p>{selected.notes||'No extra note was provided.'}</p><div className="detail-actions"><button onClick={()=>change(selected.id,'researching')}>Start research</button><button onClick={()=>change(selected.id,'scheduled')}>Mark scheduled</button><button onClick={()=>change(selected.id,'completed')}>Complete</button></div><button className="detail-delete-btn" onClick={remove}><FA name="trash"/> Delete requested product</button></>}>
+      <CardHead icon="file-lines" title="All Product Requests" sub="Review, recategorise and remove product requests from the Unmask community."/>
       <AdminTable headers={['Product','Category','Requested by','Reason / What they want to know','Status','Submitted']}>
         {rows.map((r:any)=><tr key={r.id} onClick={()=>setSelected(r)}><td><b>{r.product_name}</b><small>{r.brand}</small></td><td>{r.category_label||'—'}</td><td>{r.requester_name||'Unmasker'}</td><td className="clamp">{r.notes||'—'}</td><td><Pill>{r.status}</Pill></td><td>{fmtDate(r.created_at)}</td></tr>)}
       </AdminTable>
