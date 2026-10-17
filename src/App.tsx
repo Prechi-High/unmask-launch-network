@@ -819,7 +819,7 @@ function CommunityFeed({ items=[], onLike, compact=false, publicView=false }:any
         </div>
 
         {item.has_unmask_photo&&<button className="post-product-image" onClick={()=>setOpen(expanded?null:item.id)} aria-label={'View '+item.product_name+' experience'}>
-          <img src={'/api/unmask-photo?id='+encodeURIComponent(item.id)} alt={item.product_name||'Product unmasked'} loading="lazy"/>
+          <img src={'/api/unmask-photo?id='+encodeURIComponent(item.id)} alt={item.product_name||'Product experience'} loading="lazy"/>
         </button>}
 
         <button className="post-story" onClick={()=>setOpen(expanded?null:item.id)}>
@@ -938,7 +938,7 @@ function Dashboard({ go }: any) {
       </div>
       <div className="mission-track dynamic-target">{Array.from({length:missionTarget}).map((_,i)=><span key={i} className={i<missionDone?'done':''}>{i<missionDone?<FA name="check"/>:i+1}</span>)}</div>
       <div className="mission-actions">
-        <button className="btn solid" onClick={()=>go('unmask')}>{missionDone>=missionTarget?'Mission complete — unmask another':'Continue the mission'} <FA name="arrow-right"/></button>
+        <button className="btn solid" onClick={()=>go('unmask')}>{missionDone>=missionTarget?'Mission complete — share another':'Continue the mission'} <FA name="arrow-right"/></button>
       </div>
     </section>}
 
@@ -1029,14 +1029,14 @@ function Trends({ go, session }: any) {
     <section className="live-overview">
       <div><span className="live-dot"/><strong>{stats.unmasked_today||0}</strong><small>experiences today</small></div>
       <div><strong>{stats.unmaskers_total||0}</strong><small>Unmaskers</small></div>
-      <div><strong>{trends.total_votes||0}</strong><small>category votes</small></div>
+      <div><strong>{trends.total_suggestions||0}</strong><small>product requests</small></div>
       <div><strong>{trends.total_suggestions||0}</strong><small>product requests</small></div>
     </section>
 
     <LiveTrendBoard data={trends} go={go} full/>
 
     <section className="community-now trends-community">
-      <div className="section-head compact"><div><div className="live-label"><span className="live-dot"/><b>RECENT UNMASKINGS</b></div><h2>What people have been through with their products.</h2></div></div>
+      <div className="section-head compact"><div><div className="live-label"><span className="live-dot"/><b>RECENT EXPERIENCES</b></div><h2>What people learned after using their products.</h2></div></div>
       <CommunityFeed items={feed} onLike={like} publicView={!session}/>
     </section>
   </>;
@@ -1326,7 +1326,7 @@ function Unmask({ go }: any) {
       <div className="share-after-unmask">
         <div className="share-after-copy">
           <span className="share-after-icon"><i className="fa-brands fa-whatsapp"/></span>
-          <div><b>Put this unmasking on your status.</b><small>Let friends see what the product was really like — and bring more Unmaskers into the movement.</small></div>
+          <div><b>Share this experience on your status.</b><small>Let friends see what happened after use — and bring more Unmaskers into the movement.</small></div>
         </div>
         <div className="share-after-actions">
           <button className="btn whatsapp-share" onClick={()=>shareWhatsApp({
