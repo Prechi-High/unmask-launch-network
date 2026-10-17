@@ -190,8 +190,8 @@ function Landing({ go, session }: any) {
       </div>
 
       <div className="movement-manifesto">
-        <div className="manifesto-stamp">UNMASK IT.</div>
-        <h2>If a product deserves praise, say it. If it wasted your money, drag it into the light.</h2>
+        <div className="manifesto-stamp">SHARE WHAT HAPPENED.</div>
+        <h2>If you’ve used it, your experience can help the next buyer.</h2>
         <p>Your experience helps the next buyer now — and helps us build the Unmask tool category by category for the whole community.</p>
       </div>
     </section>
@@ -308,7 +308,7 @@ function NotificationCenter({ userId, go }:any){
             <small className="notification-detail-time">{new Date(selectedNotification.created_at).toLocaleString(undefined,{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</small>
 
             {selectedNotification.type==='helpful'&&selectedNotification.payload?.link&&<button className="notification-detail-action" onClick={()=>followNotificationLink(selectedNotification)}>
-              View unmasking <FA name="arrow-right"/>
+              View experience <FA name="arrow-right"/>
             </button>}
           </div>
         : <>
@@ -480,7 +480,7 @@ function Auth({ go, loginFirst = false, session = null }: any) {
         {session&&<button className="auth-dashboard-return" onClick={()=>go('dashboard')}>Return to dashboard <FA name="arrow-right"/></button>}
       </div>
       <Brand onClick={()=>go('landing')} />
-      <div className="auth-copy"><span className="eyebrow">{mode === 'signup' ? 'BECOME AN UNMASKER' : 'WELCOME BACK'}</span><h1>{mode === 'signup' ? 'Join the people revealing what products are really like.' : 'Keep unmasking.'}</h1><p>{mode === 'signup' ? 'Share what you have learned from products you have actually used. Help the next person buy smarter.' : 'Your Unmasker mission and community are waiting for you.'}</p></div>
+      <div className="auth-copy"><span className="eyebrow">{mode === 'signup' ? 'BECOME AN UNMASKER' : 'WELCOME BACK'}</span><h1>{mode === 'signup' ? 'Join the people revealing what products are really like.' : 'Keep contributing.'}</h1><p>{mode === 'signup' ? 'Share what you have learned from products you have actually used. Help the next person buy smarter.' : 'Your Unmasker mission and community are waiting for you.'}</p></div>
       <div className="auth-tabs"><button className={mode==='signup'?'active':''} onClick={() => {setMode('signup');setStep('form');setNotice(null)}}>Create account</button><button className={mode==='login'?'active':''} onClick={() => {setMode('login');setStep('form');setNotice(null)}}>Log in</button></div>
 
       {mode === 'signup' && step === 'form' && <form className="form-stack" onSubmit={signup}>
@@ -903,7 +903,7 @@ function Dashboard({ go }: any) {
   const inviteShare=async(mode:'native'|'whatsapp'|'copy'='native')=>{
     if(!summary?.referralCode)return;
     const link=window.location.origin+'/api/invite?ref='+encodeURIComponent(summary.referralCode);
-    const text='We’re building Unmask together — a community that reveals what products are really like before people buy. Join as an Unmasker and unmask something you’ve used.\n\n'+link;
+    const text='We’re building Unmask together — starting with Skincare. Join as an Unmasker, share what you learned from products you’ve used, and help shape the first tester build.\n\n'+link;
     try{
       if(mode==='whatsapp') return window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank','noopener,noreferrer');
       if(mode==='native' && navigator.share) return await navigator.share({title:'Join the Unmaskers',text,url:link});
