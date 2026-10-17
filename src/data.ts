@@ -234,3 +234,17 @@ export async function logout(){
   const { error } = await supabase.auth.signOut();
   if(error) throw error;
 }
+
+
+export async function claimTesterGroupJoin(code:string){
+  const { data, error } = await supabase.rpc('claim_tester_group_join',{p_code:code});
+  if(error) throw error;
+  if(!data?.ok){
+    const reason=data?.reason;
+    if(reason==='wrong_code') throw new Error('That tester code is not correct.');
+    if(reason==='verification_not_ready') throw new Error('Tester verification is not open yet.');
+    if(reason==='tester_program_inactive') throw new Error('The tester group is not open right now.');
+    throw new Error('Could not verify tester membership.');
+  }
+  return data;
+}
