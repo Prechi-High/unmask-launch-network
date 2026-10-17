@@ -53,6 +53,17 @@ export async function updateRequestStatus(id:string,status:string){
   if(error) throw error;
 }
 
+export async function deleteProductRequest(id:string){
+  const { data, error } = await supabase.rpc('admin_delete_product_request',{p_id:id});
+  if(error) throw error;
+  return Boolean(data);
+}
+
+export async function updateProductRequestCategory(id:string,category:string){
+  const { error } = await supabase.rpc('admin_update_product_request_category',{p_id:id,p_category:category});
+  if(error) throw error;
+}
+
 export async function updateExperienceStatus(id:string,status:string){
   const { error } = await supabase.rpc('admin_update_experience_status',{p_id:id,p_status:status});
   if(error) throw error;
