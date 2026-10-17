@@ -591,7 +591,7 @@ function CategoryVoteModal({ categories, trends, currentVote, onClose, onVote, b
   return <div className="category-picker-shell" onMouseDown={onClose}>
     <section className="category-modal" onMouseDown={e=>e.stopPropagation()}>
       <div className="modal-grip"/>
-      <div className="modal-title-row"><div><span className="eyebrow">YOUR VOTE SHAPES THE BUILD</span><h2>What should Unmask build first?</h2><p>Pick the category you most want us to unlock. You can change your vote while voting is open.</p></div><button className="modal-close" onClick={onClose}><FA name="xmark"/></button></div>
+      <div className="modal-title-row"><div><span className="eyebrow">YOUR VOTE SHAPES THE NEXT BUILD</span><h2>What should Unmask build next?</h2><p>Skincare is our founding category. When the next category race opens, this is where you’ll help choose what comes after it.</p></div><button className="modal-close" onClick={onClose}><FA name="xmark"/></button></div>
       <div className="category-modal-grid">
         {categories.map((cat:any)=><button key={cat.id} className={'category-modal-card '+(selected===cat.id?'selected':'')} onClick={()=>setSelected(cat.id)}>
           <img src={categoryImage(cat.name)} alt={cat.name}/>
