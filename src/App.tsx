@@ -627,8 +627,8 @@ function Countdown({ endsAt }:any) {
     return()=>clearInterval(timer);
   },[endsAt]);
 
-  if(!endsAt) return <div className="vote-countdown waiting"><FA name="clock"/><span>Voting date will be announced</span></div>;
-  if(left.ended) return <div className="vote-countdown ended"><FA name="flag-checkered"/><span>Voting has ended</span></div>;
+  if(!endsAt) return <div className="vote-countdown waiting"><FA name="clock"/><span>Date will be announced</span></div>;
+  if(left.ended) return <div className="vote-countdown ended"><FA name="flag-checkered"/><span>Countdown complete</span></div>;
 
   return <div className="vote-countdown">
     <div><strong>{left.days}</strong><span>days</span></div>
