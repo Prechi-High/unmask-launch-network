@@ -143,3 +143,27 @@ export async function saveMission(input:{
   if(error) throw error;
   return data;
 }
+
+
+export async function getAdminTesterProgram(){
+  const { data, error } = await supabase.rpc('admin_get_tester_program');
+  if(error) throw error;
+  return data || {};
+}
+
+export async function saveAdminTesterProgram(input:{
+  groupUrl:string;
+  verificationCode:string;
+  coinAmount:number;
+  firstTestAt:string|null;
+  active:boolean;
+}){
+  const { error } = await supabase.rpc('admin_save_tester_program',{
+    p_group_url:input.groupUrl||'',
+    p_verification_code:input.verificationCode||'',
+    p_coin_amount:Number(input.coinAmount||0),
+    p_first_test_at:input.firstTestAt?new Date(input.firstTestAt).toISOString():null,
+    p_active:Boolean(input.active)
+  });
+  if(error) throw error;
+}
