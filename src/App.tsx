@@ -551,65 +551,34 @@ function productsForCategory(products:any[] = [],categoryName:string){
 }
 
 function LiveTrendBoard({ data, go, full=false }:any){
-  const categories=data?.categories||[];
-  const [expanded,setExpanded]=useState<string|null>(categories?.[0]?.id||null);
-
-  useEffect(()=>{
-    if(!expanded && categories?.[0]?.id) setExpanded(categories[0].id);
-  },[categories,expanded]);
-
-  const totalVotes=Number(data?.total_votes||categories.reduce((n:number,c:any)=>n+Number(c.votes||0),0));
-  const visible=full?categories:categories.slice(0,7);
+  const allProducts=Array.isArray(data?.products)?data.products:[];
+  const skincare=allProducts.filter((p:any)=>{
+    const raw=[p?.category,p?.brand,p?.product_name].filter(Boolean).join(' ').toLowerCase();
+    return /skin|beauty|cosmetic|serum|cleanser|cream|lotion|sunscreen|toner|moisturi|acne|face/.test(raw);
+  });
+  const products=(skincare.length?skincare:allProducts);
+  const visible=full?products:products.slice(0,6);
+  const totalRequests=visible.reduce((n:number,p:any)=>n+Number(p.suggestions||0),0);
 
   return <section className={'live-pulse '+(full?'full':'')}>
     <div className="live-pulse-head">
       <div>
-        <div className="live-label"><span className="live-dot"/><b>LIVE CATEGORY PULSE</b></div>
-        <h2>{full?'What everyone is pushing forward.':'The heat of the moment.'}</h2>
-        <p>Votes and product requests update here as Unmaskers make their choices.</p>
+        <div className="live-label"><span className="live-dot"/><b>SKINCARE BUILD PULSE</b></div>
+        <h2>{full?'What people want the first Skincare Unmask to cover.':'Products people want us to look into.'}</h2>
+        <p>Product requests and real owner experiences are shaping what we prioritise while the first Skincare build is in development.</p>
       </div>
-      <div className="live-total"><strong>{totalVotes}</strong><span>total category {totalVotes===1?'vote':'votes'}</span></div>
+      <div className="live-total"><strong>{totalRequests}</strong><span>requests shown</span></div>
     </div>
 
-    <div className="category-heat-list">
-      {visible.map((cat:any,index:number)=>{
-        const open=expanded===cat.id;
-        const products=productsForCategory(data?.products||[],cat.name);
-        const pct=totalVotes?Math.round((Number(cat.votes||0)/totalVotes)*100):0;
-        const productRows=full?products:products.slice(0,3);
-        return <article className={'heat-category '+(open?'open':'')} key={cat.id}>
-          <button className="heat-category-main" onClick={()=>setExpanded(open?null:cat.id)}>
-            <div className="heat-image-wrap">
-              <img src={categoryImage(cat.name)} alt={cat.name}/>
-              <span className="heat-rank">{index+1}</span>
-            </div>
-            <div className="heat-meta">
-              <div className="heat-name-row"><h3>{cat.name}</h3>{index===0&&<span className="hot-chip">Leading</span>}</div>
-              <div className="heat-vote-line"><strong>{cat.votes||0}</strong> total {Number(cat.votes||0)===1?'vote':'votes'}</div>
-              <div className="heat-bar"><span style={{width:(totalVotes?pct:0)+'%'}}/></div>
-            </div>
-            <div className="pulse-visual" aria-hidden="true"><i/><i/><i/><i/><i/></div>
-            <FA name={open?'chevron-up':'chevron-down'}/>
-          </button>
+    {!visible.length?<div className="heat-empty"><FA name="sparkles"/><span>No Skincare product requests yet. Suggest one and help shape the first build.</span></div>:
+      <div className="heat-product-grid founding-request-grid">{visible.map((p:any,i:number)=><article className="heat-product" key={p.key||p.product_name||i}>
+        <span className="product-rank">{i+1}</span>
+        <div className="product-thumb"><FA name="pump-soap"/></div>
+        <div><b>{p.product_name}</b><small>{p.brand||p.category||'Skincare'}</small></div>
+        <strong>{p.suggestions||0}</strong>
+      </article>)}</div>}
 
-          {open&&<div className="heat-products">
-            <div className="heat-products-head">
-              <div><b>{full?'Product requests in ':'Top product requests in '}{cat.name}</b><span>{products.reduce((n:number,p:any)=>n+Number(p.suggestions||0),0)} total requests</span></div>
-              {!full&&<button onClick={()=>go('trends')}>View all <FA name="arrow-right"/></button>}
-            </div>
-            {!productRows.length?<div className="heat-empty"><FA name="sparkles"/><span>No product requests in this category yet. The first suggestion will show here live.</span></div>:
-              <div className="heat-product-grid">{productRows.map((p:any,i:number)=><article className="heat-product" key={p.key||p.product_name}>
-                <span className="product-rank">{i+1}</span>
-                <div className="product-thumb"><FA name="box-open"/></div>
-                <div><b>{p.product_name}</b><small>{p.brand||cat.name}</small></div>
-                <strong>{p.suggestions||0}</strong>
-              </article>)}</div>}
-          </div>}
-        </article>
-      })}
-    </div>
-
-    {!full&&<button className="live-board-link" onClick={()=>go('trends')}>See the full live board <FA name="arrow-right"/></button>}
+    {!full&&<button className="live-board-link" onClick={()=>go('trends')}>See the full Skincare build pulse <FA name="arrow-right"/></button>}
   </section>;
 }
 
@@ -1030,7 +999,7 @@ function Trends({ go, session }: any) {
       <div><span className="live-dot"/><strong>{stats.unmasked_today||0}</strong><small>experiences today</small></div>
       <div><strong>{stats.unmaskers_total||0}</strong><small>Unmaskers</small></div>
       <div><strong>{trends.total_suggestions||0}</strong><small>product requests</small></div>
-      <div><strong>{trends.total_suggestions||0}</strong><small>product requests</small></div>
+      <div><strong>{stats.unmasked_total||0}</strong><small>experiences shared</small></div>
     </section>
 
     <LiveTrendBoard data={trends} go={go} full/>
