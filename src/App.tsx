@@ -24,7 +24,8 @@ import {
   toggleUnmaskLike,
   verifyOwnership,
   uploadProfileAvatar,
-  logout
+  logout,
+  claimTesterGroupJoin
 } from './data';
 import { supabase } from './supabase';
 import AdminConsole from './Admin';
@@ -64,8 +65,8 @@ async function enableBrowserPush(){
 function unmaskShare(item:any){
   const url=window.location.origin+'/?post='+encodeURIComponent(item.id);
   const author=item.author_name||'An Unmasker';
-  const text='🕵️ '+author+' unmasked '+item.product_name+'.\n\nSee what really happened with the product — shared by the Unmask community. Know before you buy.\n\n'+url;
-  return {url,text,title:'Unmasked: '+item.product_name};
+  const text='🕵️ '+author+' shared an experience with '+item.product_name+'.\n\nSee what really happened after use — shared by the Unmask community. Know before you buy.\n\n'+url;
+  return {url,text,title:'Experience: '+item.product_name};
 }
 
 async function shareNative(item:any){
@@ -178,11 +179,11 @@ function Landing({ go, session }: any) {
         <h1>We reveal what products are <em>really</em> like.</h1>
         <p>Used something? Tell people what actually happened. Together, we’re building Unmask — the tool that will let you photograph a product and see what real users discovered before you buy.</p>
         <div className="movement-actions">
-          <button className="btn solid movement-primary" onClick={()=>go(session?'unmask':'auth')}>Unmask a product <FA name="arrow-right"/></button>
+          <button className="btn solid movement-primary" onClick={()=>go(session?'unmask':'auth')}>Share an experience <FA name="arrow-right"/></button>
           <button className="btn ghost" onClick={()=>go('trends')}>See what Unmaskers are doing</button>
         </div>
         <div className="movement-stats">
-          <div><strong>{stats.unmasked_today||0}</strong><span>unmasked today</span></div>
+          <div><strong>{stats.unmasked_today||0}</strong><span>experiences today</span></div>
           <div><strong>{stats.unmasked_total||0}</strong><span>products shared</span></div>
           <div><strong>{stats.unmaskers_total||0}</strong><span>Unmaskers</span></div>
         </div>
@@ -200,23 +201,23 @@ function Landing({ go, session }: any) {
       <h2>Know a product. Tell the truth. Help the next buyer.</h2>
       <div className="simple-steps">
         <article><span>1</span><b>Pick something you’ve used</b><small>Something in your house, bag, bathroom, kitchen or pocket.</small></article>
-        <article><span>2</span><b>Unmask what happened</b><small>How long it lasted, what worked, what failed, what surprised you.</small></article>
+        <article><span>2</span><b>Share what happened</b><small>How long it lasted, what worked, what failed, what surprised you.</small></article>
         <article><span>3</span><b>Leave the truth behind</b><small>Another person sees the experience before spending their money.</small></article>
       </div>
     </section>
 
     <section className="landing-build-layer">
-      <BuildRoadmap buildState={buildState} currentVote={null} onVote={()=>go(session?'dashboard':'auth')} compact/>
+      <BuildRoadmap buildState={buildState} authenticated={Boolean(session)} onShare={()=>go(session?'unmask':'auth')} onSuggest={()=>go(session?'suggest':'auth')} onJoinTester={()=>go('auth')} compact/>
     </section>
 
     <section className="landing-feed">
-      <div className="section-head"><div><span className="eyebrow">UNMASKERS ARE ACTIVE</span><h2>See what people are unmasking.</h2></div><button className="text-btn" onClick={()=>go('trends')}>See live activity <FA name="arrow-right"/></button></div>
+      <div className="section-head"><div><span className="eyebrow">REAL EXPERIENCES FROM UNMASKERS</span><h2>See what people learned after using their products.</h2></div><button className="text-btn" onClick={()=>go('trends')}>See live activity <FA name="arrow-right"/></button></div>
       <CommunityFeed items={feed} compact publicView/>
     </section>
 
     <section className="landing-join">
-      <div><span className="eyebrow">YOUR TURN</span><h2>Look around you. Pick one product. Unmask it.</h2><p>That is how the community grows — one honest experience at a time.</p></div>
-      <button className="btn solid" onClick={()=>go(session?'unmask':'auth')}>{session?'Unmask now':'Join and unmask'} <FA name="arrow-right"/></button>
+      <div><span className="eyebrow">YOUR TURN</span><h2>Look around you. Pick one product. Share your experience.</h2><p>What you learned after using it can help the next buyer before they spend.</p></div>
+      <button className="btn solid" onClick={()=>go(session?'unmask':'auth')}>{session?'Share an experience':'Join and share'} <FA name="arrow-right"/></button>
     </section>
   </main>;
 }
@@ -403,7 +404,7 @@ function ProfileMenu({ summary, go }:any){
 function Shell({ children, go, active, summary }: any) {
   const nav = [
     ['dashboard','Home','house'],
-    ['unmask','Unmask','camera'],
+    ['unmask','Share','comment-dots'],
     ['trends','Live','bolt']
   ];
   return <main className="app-shell">
@@ -669,30 +670,59 @@ function Countdown({ endsAt }:any) {
 }
 
 const BUILD_STEPS=[
-  ['voting','Vote','Unmaskers choose what we should build first.'],
-  ['selecting','Selected','We lock the category for this build round.'],
-  ['building','Building','We build the deep unmasking experience for it.'],
-  ['testing','Testing','Unmaskers get first access and help us test it.'],
-  ['live','Live','The category opens for full Unmask searches.']
+  ['building','Building','We’re building the first deep Unmask experience for this category.'],
+  ['testing','First Test','Founding Testers get the first usable build and tell us what breaks or feels unclear.'],
+  ['improving','Improve','We fix the important problems testers uncover.'],
+  ['live','V1 Live','The first category opens for people to Unmask products before buying.']
 ];
 
-function BuildRoadmap({ buildState, currentVote, onVote, compact=false }:any) {
+function BuildRoadmap({ buildState, onShare, onSuggest, onJoinTester, onClaimed, authenticated=false, compact=false }:any) {
   const round=buildState?.round||{};
-  const phase=round.phase||'voting';
-  const activeIndex=Math.max(0,BUILD_STEPS.findIndex(([key])=>key===phase));
+  const phase=round.phase||'building';
   const selected=buildState?.categories?.find((c:any)=>c.id===round.selected_category_id);
+  const tester=buildState?.tester_program||{};
+  const phaseKey=phase==='testing'?'testing':phase==='live'?'live':phase==='selecting'?'improving':'building';
+  const activeIndex=Math.max(0,BUILD_STEPS.findIndex(([key])=>key===phaseKey));
   const completed=(buildState?.completed_categories||[]).filter((c:any)=>c.id!==selected?.id);
+  const [showVerify,setShowVerify]=useState(false);
+  const [testerCode,setTesterCode]=useState('');
+  const [testerBusy,setTesterBusy]=useState(false);
+  const [testerNotice,setTesterNotice]=useState('');
+  const [joined,setJoined]=useState(Boolean(tester?.joined));
+
+  useEffect(()=>setJoined(Boolean(tester?.joined)),[tester?.joined]);
+
+  const joinTester=()=>{
+    if(!authenticated){onJoinTester?.();return;}
+    if(!tester?.group_url)return;
+    window.open(tester.group_url,'_blank','noopener,noreferrer');
+    setShowVerify(true);
+    setTesterNotice('After joining the WhatsApp group, enter the tester code posted there.');
+  };
+
+  const verifyTester=async()=>{
+    if(!testerCode.trim())return;
+    setTesterBusy(true);setTesterNotice('');
+    try{
+      const out=await claimTesterGroupJoin(testerCode.trim());
+      setJoined(true);
+      setShowVerify(false);
+      setTesterNotice('You’re now a Founding Tester. '+Number(out?.coin_amount||tester.coin_amount||0)+' Coins added.');
+      onClaimed?.();
+    }catch(e:any){setTesterNotice(e.message||'Could not verify tester membership.')}
+    finally{setTesterBusy(false)}
+  };
 
   return <section className={'build-vision build-progress-v2 '+(compact?'compact':'')}>
     <div className="build-vision-top">
       <div>
         <span className="build-kicker"><FA name="hammer"/> BUILDING UNMASK CATEGORY BY CATEGORY</span>
-        <h2>See exactly what we’re building now.</h2>
-        <p>Each category moves through five clear stages. When one reaches Live, it stays in our completed list while the next category begins its own journey.</p>
+        <h2>We’re starting with {selected?.name||'our founding category'}.</h2>
+        <p>We’re not waiting for a category vote to begin. We’re building now with real users, real product experiences and Founding Testers.</p>
       </div>
       <div className="future-tool-card">
         <span><FA name="camera"/></span>
-        <div><b>Picture a product</b><small>See what real users discovered before you spend.</small></div>
+        <div><b>Unmask a product</b><small>Photograph it and see what real users discovered before you spend.</small></div>
       </div>
     </div>
 
@@ -701,21 +731,24 @@ function BuildRoadmap({ buildState, currentVote, onVote, compact=false }:any) {
       <div>{completed.map((c:any)=><article key={c.id}><FA name="circle-check"/><div><b>{c.name}</b><small>Live on Unmask</small></div></article>)}</div>
     </div>}
 
-    <div className="current-build-card">
+    <div className="current-build-card founding-build-card">
       <div className="current-build-heading">
         <div>
-          <span className="eyebrow">{selected?'CURRENT CATEGORY':'CURRENT ROUND'}</span>
-          <h3>{selected?selected.name:(phase==='voting'?'Choosing the next category':'Category not selected yet')}</h3>
-          <p>{selected
-            ? 'Follow '+selected.name+' as it moves from selection to a full Unmask category.'
-            : 'Unmaskers are choosing which category should move through the build next.'}</p>
+          <span className="eyebrow">FOUNDING CATEGORY</span>
+          <h3>{selected?.name||tester?.category_name||'Skincare'}</h3>
+          <p>Help shape what an Unmask for this category should reveal before the first public version goes live.</p>
         </div>
-        <span className={'build-stage-badge stage-'+phase}>{BUILD_STEPS[activeIndex]?.[1]||'Vote'}</span>
+        <span className={'build-stage-badge stage-'+phaseKey}>{BUILD_STEPS[activeIndex]?.[1]||'Building'}</span>
       </div>
 
-      <div className="build-stage-track">
+      <div className="first-test-countdown">
+        <div><span>FIRST TESTER BUILD IN</span><strong>Founding Testers get access first.</strong></div>
+        <Countdown endsAt={tester?.first_test_at||round.first_test_at}/>
+      </div>
+
+      <div className="build-stage-track founding-track">
         {BUILD_STEPS.map(([key,label],i)=>{
-          const done=i<activeIndex || (phase==='live'&&i===activeIndex);
+          const done=i<activeIndex || (phaseKey==='live'&&i===activeIndex);
           const active=i===activeIndex;
           return <article key={key} className={(done?'done ':'')+(active?'active ':'')}>
             <span>{done?<FA name="check"/>:i+1}</span>
@@ -725,26 +758,41 @@ function BuildRoadmap({ buildState, currentVote, onVote, compact=false }:any) {
         })}
       </div>
 
-      <div className="build-current-action">
+      <div className="build-current-action founding-actions">
         <div>
-          <b>{BUILD_STEPS[activeIndex]?.[1]||'Vote'}</b>
+          <b>{BUILD_STEPS[activeIndex]?.[1]||'Building'}</b>
           <span>{BUILD_STEPS[activeIndex]?.[2]}</span>
         </div>
+        <div className="founding-action-buttons">
+          <button className="btn solid" onClick={onShare}><FA name="comment-dots"/> Share a {String(selected?.name||'product').toLowerCase()} experience</button>
+          <button className="btn ghost" onClick={onSuggest}><FA name="magnifying-glass"/> Suggest a product</button>
+        </div>
+      </div>
 
-        {phase==='voting'&&<>
-          {currentVote&&<div className="vote-status"><FA name="circle-check"/>Your vote: <b>{currentVote}</b></div>}
-          <button className="btn solid" onClick={onVote}>{currentVote?'Change my vote':'Vote for a category'} <FA name="arrow-right"/></button>
-        </>}
-
-        {phase==='testing'&&selected?.testing_url&&<a className="btn solid build-test-btn" href={selected.testing_url} target="_blank" rel="noreferrer">
-          Test {selected.name} <FA name="arrow-up-right-from-square"/>
-        </a>}
-
-        {phase==='testing'&&!selected?.testing_url&&<span className="testing-wait">Testing access is being prepared.</span>}
+      <div className="tester-group-card">
+        <div className="tester-group-icon"><i className="fa-brands fa-whatsapp"/></div>
+        <div className="tester-group-copy">
+          <span className="eyebrow">FOUNDING TESTERS</span>
+          <h4>Test the first build with us on WhatsApp.</h4>
+          <p>Get the test link, complete real tasks, report what confuses you, and help shape the first {selected?.name||'category'} V1.</p>
+          {Number(tester?.coin_amount||0)>0&&<small><FA name="coins"/> +{tester.coin_amount} Coins after your group membership is verified.</small>}
+        </div>
+        <div className="tester-group-actions">
+          {joined
+            ? <span className="tester-joined"><FA name="circle-check"/> Founding Tester</span>
+            : <button className="btn solid whatsapp-tester-btn" disabled={authenticated&&!tester?.group_url} onClick={joinTester}>
+                <i className="fa-brands fa-whatsapp"/> {authenticated?(tester?.group_url?'Join tester group':'Group link opening soon'):'Join Founding Testers'}
+              </button>}
+        </div>
+        {!joined&&authenticated&&showVerify&&<div className="tester-verify">
+          <input value={testerCode} onChange={e=>setTesterCode(e.target.value)} placeholder="Enter tester code from the group"/>
+          <button disabled={testerBusy||!testerCode.trim()} onClick={verifyTester}>{testerBusy?'Checking…':'Verify & claim Coins'}</button>
+        </div>}
+        {testerNotice&&<div className={'tester-notice '+(joined?'success':'')}>{testerNotice}</div>}
       </div>
 
       <div className="build-round-meta">
-        {phase==='voting'?<><span>Voting closes in</span><Countdown endsAt={round.voting_ends_at}/></>:<><span>Current status</span><strong>{BUILD_STEPS[activeIndex]?.[1]||'Building'}</strong></>}
+        <span>Current focus</span><strong>{selected?.name||'Founding category'} V1</strong>
         <small>{buildState?.experiences_gathered||0} real product experiences gathered by Unmaskers</small>
       </div>
     </div>
@@ -766,7 +814,7 @@ function CommunityFeed({ items=[], onLike, compact=false, publicView=false }:any
           <span className={'post-avatar '+(item.author_avatar_url?'has-image':'')}>
             {item.author_avatar_url?<img src={item.author_avatar_url} alt={item.author_name||'Unmasker'}/>:initial}
           </span>
-          <div className="post-person"><b>{item.author_name||'An Unmasker'}</b><span>unmasked <strong>{item.product_name}</strong></span></div>
+          <div className="post-person"><b>{item.author_name||'An Unmasker'}</b><span>shared an experience with <strong>{item.product_name}</strong></span></div>
           <span className="post-time">{new Date(item.created_at).toLocaleDateString(undefined,{month:'short',day:'numeric'})}</span>
         </div>
 
@@ -775,7 +823,7 @@ function CommunityFeed({ items=[], onLike, compact=false, publicView=false }:any
         </button>}
 
         <button className="post-story" onClick={()=>setOpen(expanded?null:item.id)}>
-          <div className="post-product-line"><span>UNMASKED</span><b>{item.product_name}</b>{item.brand&&<small>{item.brand}</small>}</div>
+          <div className="post-product-line"><span>EXPERIENCE</span><b>{item.product_name}</b>{item.brand&&<small>{item.brand}</small>}</div>
           <p className={expanded?'expanded':''}>{item.body}</p>
           <div className="post-context">
             {item.used_duration&&<span><FA name="clock"/>{String(item.used_duration).replaceAll('_',' ')}</span>}
@@ -807,8 +855,6 @@ function Dashboard({ go }: any) {
   const [buildState,setBuildState]=useState<any>({round:null,categories:[],experiences_gathered:0});
   const [notice,setNotice]=useState<any>(null);
   const [clickedTask,setClickedTask]=useState<string|null>(null);
-  const [showCategoryPicker,setShowCategoryPicker]=useState(false);
-  const [voteBusy,setVoteBusy]=useState(false);
 
   const refresh=async()=>{
     const [sm,st,mi,fd,tr,ca,bs]=await Promise.all([
@@ -838,17 +884,6 @@ function Dashboard({ go }: any) {
       const result=await toggleUnmaskLike(item.id);
       setFeed(rows=>rows.map(x=>x.id===item.id?{...x,likes:result.likes,liked_by_me:result.liked}:x));
     }catch(err:any){setNotice({tone:'error',text:err.message})}
-  };
-
-  const pickCategory=async(id:string)=>{
-    setVoteBusy(true);
-    try{
-      await chooseCategory(id);
-      await refresh();
-      setShowCategoryPicker(false);
-      setNotice({tone:'success',text:'Your vote is live. You helped decide what Unmask builds first.'});
-    }catch(err:any){setNotice({tone:'error',text:err.message})}
-    finally{setVoteBusy(false)}
   };
 
   const social=async(task:any)=>{
@@ -886,12 +921,12 @@ function Dashboard({ go }: any) {
     <section className="unmasker-hero">
       <div className="unmasker-hero-copy">
         <span className="eyebrow">YOU ARE AN UNMASKER</span>
-        <h1>What are you going to <em>unmask today?</em></h1>
+        <h1>What product experience can you <em>share today?</em></h1>
         <p>Pick a product you know. Tell people what really happened. Good, bad, broken, brilliant — reveal it.</p>
-        <button className="btn solid hero-unmask-btn" onClick={()=>go('unmask')}><FA name="camera"/> Unmask a product</button>
+        <button className="btn solid hero-unmask-btn" onClick={()=>go('unmask')}><FA name="comment-dots"/> Share an experience</button>
       </div>
       <div className="today-live">
-        <span className="live-dot"/><b>{stats.unmasked_today||0} unmasked today</b>
+        <span className="live-dot"/><b>{stats.unmasked_today||0} experiences shared today</b>
         <small>{stats.active_unmaskers_today||0} Unmaskers have shared something today</small>
       </div>
     </section>
@@ -909,7 +944,7 @@ function Dashboard({ go }: any) {
 
     <section className="invite-unmasker-card">
       <div className="invite-unmasker-mark"><FA name="people-group"/></div>
-      <div className="invite-unmasker-copy"><span className="eyebrow">BRING SOMEONE INTO THE MOVEMENT</span><h3>Know someone with product stories?</h3><p>Invite them to unmask what they’ve used. The more real experiences the community leaves behind, the stronger Unmask becomes.</p></div>
+      <div className="invite-unmasker-copy"><span className="eyebrow">BRING SOMEONE INTO THE MOVEMENT</span><h3>Know someone with product stories?</h3><p>Invite them to share what they learned after using a product. Those real experiences help the next buyer and help us build Unmask.</p></div>
       <div className="invite-share-actions">
         <button className="btn solid" onClick={()=>inviteShare('native')}><FA name="share-nodes"/> Share invite</button>
         <button className="btn ghost" onClick={()=>inviteShare('whatsapp')}><i className="fa-brands fa-whatsapp"/> WhatsApp</button>
@@ -917,26 +952,26 @@ function Dashboard({ go }: any) {
       </div>
     </section>
 
-    <BuildRoadmap buildState={buildState} currentVote={summary?.voteName} onVote={()=>setShowCategoryPicker(true)}/>
+    <BuildRoadmap buildState={buildState} authenticated onShare={()=>go('unmask')} onSuggest={()=>go('suggest')} onJoinTester={()=>go('dashboard')} onClaimed={refresh}/>
 
     <section className="community-now">
       <div className="section-head compact">
-        <div><div className="live-label"><span className="live-dot"/><b>THE COMMUNITY IS UNMASKING</b></div><h2>What Unmaskers are revealing right now.</h2></div>
+        <div><div className="live-label"><span className="live-dot"/><b>REAL EXPERIENCES FROM UNMASKERS</b></div><h2>What people learned after actually using their products.</h2></div>
         <span className="community-count">{stats.unmasked_total||0} experiences shared</span>
       </div>
       <CommunityFeed items={feed} onLike={like}/>
-      <div className="community-view-more"><button className="btn ghost" onClick={()=>go('trends')}>View more unmaskings <FA name="arrow-right"/></button></div>
+      <div className="community-view-more"><button className="btn ghost" onClick={()=>go('trends')}>View more experiences <FA name="arrow-right"/></button></div>
     </section>
 
     <section className="simple-next">
       <button onClick={()=>go('suggest')}>
         <span className="simple-next-visual"><FA name="magnifying-glass"/></span>
-        <div><b>What do you want Unmask to cover next?</b><small>Tell us a product you are thinking about buying.</small></div>
+        <div><b>What skincare product should we investigate?</b><small>Tell us what you are thinking about buying so it can shape the first category.</small></div>
         <FA name="chevron-right"/>
       </button>
       <button onClick={()=>go('trends')}>
         <span className="simple-next-visual"><FA name="bolt"/></span>
-        <div><b>See the live Unmask board</b><small>Watch category votes and the products people are asking for.</small></div>
+        <div><b>See the live Unmask board</b><small>Watch product requests, real experiences and the Skincare build move forward.</small></div>
         <FA name="chevron-right"/>
       </button>
     </section>
@@ -952,7 +987,6 @@ function Dashboard({ go }: any) {
     </section>
 
     {notice&&<Notice tone={notice.tone}>{notice.text}</Notice>}
-    {showCategoryPicker&&<CategoryVoteModal categories={categories} trends={trends} currentVote={summary?.voteName} onClose={()=>setShowCategoryPicker(false)} onVote={pickCategory} busy={voteBusy}/>}
   </Shell>;
 }
 
@@ -990,10 +1024,10 @@ function Trends({ go, session }: any) {
   };
 
   const content=<>
-    <PageIntro kicker="UNMASK LIVE" title="See what the community is revealing." body="Real people. Real products. Real experiences — plus the live vote for what Unmask should build first."/>
+    <PageIntro kicker="UNMASK LIVE" title="See what the community is sharing." body="Real people. Real products. Real experiences — plus the live progress of the first category we’re building."/>
 
     <section className="live-overview">
-      <div><span className="live-dot"/><strong>{stats.unmasked_today||0}</strong><small>unmasked today</small></div>
+      <div><span className="live-dot"/><strong>{stats.unmasked_today||0}</strong><small>experiences today</small></div>
       <div><strong>{stats.unmaskers_total||0}</strong><small>Unmaskers</small></div>
       <div><strong>{trends.total_votes||0}</strong><small>category votes</small></div>
       <div><strong>{trends.total_suggestions||0}</strong><small>product requests</small></div>
@@ -1156,7 +1190,7 @@ function Unmask({ go }: any) {
 
       if(out.status==='verified'){
         setVerified(true);
-        setNotice({tone:'success',text:'Confirmed. This will be saved as a verified current-owner experience.'});
+        setNotice({tone:'success',text:'Confirmed. Your photo will support this verified current-owner experience.'});
         setStep(5);
       }else{
         setVerificationIssue(true);
@@ -1205,8 +1239,8 @@ function Unmask({ go }: any) {
 
   return <Shell go={go} active="unmask" summary={summary}>
     <PageIntro
-      kicker="UNMASK A PRODUCT"
-      title={step===1?'First, how do you know the product?':step===2&&ownership==='owns_now'?'Show us the product you have.':step===2?'Find the product you used.':'Let’s build your experience.'}
+      kicker="SHARE AN EXPERIENCE"
+      title={step===1?'Share what you learned from a product.':step===2&&ownership==='owns_now'?'Show us the product you have.':step===2?'Find the product you used.':'Let’s build your experience.'}
       body={step===1?'This decides the right path. Current owners prove possession with a fresh photo. Past users can simply find or enter the product they used.':ownership==='owns_now'?'We’ll identify the item from your photo, then you confirm the closest match.':'Search for the product, choose a match, or enter the name yourself.'}
     />
 
