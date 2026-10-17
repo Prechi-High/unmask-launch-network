@@ -1316,7 +1316,7 @@ function Unmask({ go }: any) {
         </div>
       </div>
 
-      <button className="text-btn success-next" onClick={reset}>Unmask another product <FA name="arrow-right"/></button>
+      <button className="text-btn success-next" onClick={reset}>Share another experience <FA name="arrow-right"/></button>
     </section>}
     {notice&&step!==4&&<Notice tone={notice.tone}>{notice.text}</Notice>}
   </Shell>;
