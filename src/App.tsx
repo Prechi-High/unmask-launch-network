@@ -552,11 +552,7 @@ function productsForCategory(products:any[] = [],categoryName:string){
 
 function LiveTrendBoard({ data, go, full=false }:any){
   const allProducts=Array.isArray(data?.products)?data.products:[];
-  const skincare=allProducts.filter((p:any)=>{
-    const raw=[p?.category,p?.brand,p?.product_name].filter(Boolean).join(' ').toLowerCase();
-    return /skin|beauty|cosmetic|serum|cleanser|cream|lotion|sunscreen|toner|moisturi|acne|face/.test(raw);
-  });
-  const products=(skincare.length?skincare:allProducts);
+  const products=allProducts.filter((p:any)=>String(p?.category||'').trim().toLowerCase()==='skincare');
   const visible=full?products:products.slice(0,6);
   const totalRequests=visible.reduce((n:number,p:any)=>n+Number(p.suggestions||0),0);
 
