@@ -547,6 +547,18 @@ function SettingsPage({overview,onSaved,setNotice}:any){
       </div>
     </section>
 
+    <section className="admin-card settings-block tester-admin-block">
+      <CardHead icon="flask" title="Founding Tester Group" sub="Configure the WhatsApp tester group, first-test countdown and tester Coin reward."/>
+      <div className="settings-form-grid">
+        <label className="settings-wide">WhatsApp group invite link<input type="url" placeholder="https://chat.whatsapp.com/..." value={testerProgram.groupUrl} onChange={e=>setTesterProgram({...testerProgram,groupUrl:e.target.value})}/><small>Users see the Join button only after this link is added.</small></label>
+        <label>Tester verification code<input type="text" placeholder="e.g. SKINCARE8" value={testerProgram.verificationCode} onChange={e=>setTesterProgram({...testerProgram,verificationCode:e.target.value})}/><small>Post this code inside the WhatsApp group. Members enter it on Unmask to verify they joined.</small></label>
+        <label>Join reward (Coins)<input type="number" min="0" value={testerProgram.coinAmount} onChange={e=>setTesterProgram({...testerProgram,coinAmount:e.target.value})}/></label>
+        <label>First tester build<input type="datetime-local" value={testerProgram.firstTestAt} onChange={e=>setTesterProgram({...testerProgram,firstTestAt:e.target.value})}/></label>
+        <label className="toggle-row"><span>Tester program active</span><span className="toggle"><input type="checkbox" checked={testerProgram.active} onChange={e=>setTesterProgram({...testerProgram,active:e.target.checked})}/><span/></span></label>
+      </div>
+      <button className="settings-save" disabled={busy==='tester-program'} onClick={saveTesterProgram}>{busy==='tester-program'?'Saving…':'Save tester settings'}</button>
+    </section>
+
     <section className="admin-card settings-block notification-builder">
       <CardHead icon="bell" title="Send Notification" sub="Send to everyone, one specific Unmasker, or a hand-picked group."/>
 
@@ -593,16 +605,4 @@ function AdminTable({headers,children}:{headers:string[],children:any}){
   return <div className="admin-table-scroll"><table className="admin-table"><thead><tr>{headers.map(h=><th key={h}>{h}</th>)}</tr></thead><tbody>{children}</tbody></table></div>
 }
 function DetailTitle({icon,title}:{icon:string,title:string}){return <div className="detail-title"><span><FA name={icon}/></span><h3>{title}</h3></div>}
-function Info({label,value}:{label:string,value:any}){return <div className="detail-info"><span>{label}</span><b>{value??'—'}</b></div>}    <section className="admin-card settings-block tester-admin-block">
-      <CardHead icon="flask" title="Founding Tester Group" sub="Configure the WhatsApp tester group, first-test countdown and tester Coin reward."/>
-      <div className="settings-form-grid">
-        <label className="settings-wide">WhatsApp group invite link<input type="url" placeholder="https://chat.whatsapp.com/..." value={testerProgram.groupUrl} onChange={e=>setTesterProgram({...testerProgram,groupUrl:e.target.value})}/><small>Users see the Join button only after this link is added.</small></label>
-        <label>Tester verification code<input type="text" placeholder="e.g. SKINCARE8" value={testerProgram.verificationCode} onChange={e=>setTesterProgram({...testerProgram,verificationCode:e.target.value})}/><small>Post this code inside the WhatsApp group. Members enter it on Unmask to verify they joined.</small></label>
-        <label>Join reward (Coins)<input type="number" min="0" value={testerProgram.coinAmount} onChange={e=>setTesterProgram({...testerProgram,coinAmount:e.target.value})}/></label>
-        <label>First tester build<input type="datetime-local" value={testerProgram.firstTestAt} onChange={e=>setTesterProgram({...testerProgram,firstTestAt:e.target.value})}/></label>
-        <label className="toggle-row"><span>Tester program active</span><span className="toggle"><input type="checkbox" checked={testerProgram.active} onChange={e=>setTesterProgram({...testerProgram,active:e.target.checked})}/><span/></span></label>
-      </div>
-      <button className="settings-save" disabled={busy==='tester-program'} onClick={saveTesterProgram}>{busy==='tester-program'?'Saving…':'Save tester settings'}</button>
-    </section>
-
-
+function Info({label,value}:{label:string,value:any}){return <div className="detail-info"><span>{label}</span><b>{value??'—'}</b></div>}
